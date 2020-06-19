@@ -3,6 +3,7 @@
 业务所属公司：广州晶绮信息科技有限公司
 作者：耿东俊（June）
 """
+
 import argparse
 import importlib
 import config
@@ -31,11 +32,12 @@ if main_num != 1:
 # 导入自定义模块
 args_name = getattr(args, main_key.replace('-', '_'))
 try:
-    m = importlib.import_module('%s.%s.%s' % (config.all_parser['main'][main_key]['module'], args_name, args_name))
+    m = importlib.import_module('%s.%s.%s.%s' % (config.business_name, config.all_parser['main'][main_key]['module'],
+                                                 args_name, args_name))
 except ModuleNotFoundError:
     raise ModuleNotFoundError('%s为%s的模块不存在，请检查目录结构是否正确！' % (main_key, args_name))
 
 # 运行模块
 if __name__ == '__main__':
-    obj = getattr(m, config.all_parser['main'][main_key]['object'])()
+    obj = getattr(m, config.all_parser['main'][main_key]['object'])(args)
     obj.run()

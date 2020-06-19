@@ -1,15 +1,41 @@
 第三方库：
 （暂无）
 
+
+
+目录架构：
+-- collection
+  -- business                 --> 业务代码
+  -- framework                --> 框架代码
+    -- core                   --> 核心组件
+      -- builder.py           --> 建造器组件
+      -- downloader.py        --> 下载器组件
+      -- engine.py            --> 引擎组件
+      -- pipeline.py          --> 管道组件
+      -- scheduler.py         --> 调度器组件
+    -- object                 --> 内置对象
+      -- item.py              --> 数据对象
+      -- request.py           --> 请求对象
+      -- response.py          --> 响应对象
+  -- utils                    --> 工具包
+  -- config.py                --> 项目配置
+  -- manage.py                --> 项目入口
+
+
+
 主参数详情：
 -gc --game-code：使用该参数会引导至game目录下对应的游戏日志采集脚本。
 
+
+
 额外参数详情：
 （暂无）
+
+
 
 特别说明：
 1、使用Python3，带上参数，运行manage.py文件。
 2、主参数有且仅有一个，起引导至对应脚本的作用。
 3、额外参数根据不同业务有不同作用，具体请查看业务代码，某些额外参数在某些业务可能是必选参数。
-4、新建脚本时，请遵守目录结构规则，例如要新建一个游戏日志采集脚本，目录结构应为“game/{game-code}/{game-code}.py”。
+4、新建脚本时，请遵守目录结构规则，例如要新建一个游戏日志采集脚本，目录结构应为“business/game/{game-code}/{game-code}.py”。
 5、每个脚本都应为一个类封装，每种类别的类名应遵守config的all_parser对应的object，并有run方法做入口。
