@@ -18,7 +18,7 @@ class Scheduler(object):
     def add_request(self, request):
         """
         添加请求对象
-        :param request:(type=[Request]) 初始请求对象
+        :param request:(type=Request) 初始请求对象
         """
 
         self.queue.put(request)
@@ -26,7 +26,7 @@ class Scheduler(object):
     def get_request(self):
         """
         获取一个请求对象并返回
-        :return request:(type=[Request]) 从Queue获取的请求对象
+        :return request:(type=Request) 从Queue获取的请求对象
         """
 
         request = self.queue.get()

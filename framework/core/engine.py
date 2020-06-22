@@ -4,11 +4,15 @@
 2.依次调用其他组件对外提供的接口，实现整个框架的运作
 """
 
-from framework.object.request import Request
+import time
 from .scheduler import Scheduler
 from .downloader import Downloader
 from .pipeline import Pipeline
 from .builder import Builder
+from framework.object.request import Request
+from framework.middlewares.builder_middlewares import BuilderMiddleware
+from framework.middlewares.downloader_middlewares import DownloaderMiddleware
+from utils import common_function as cf
 
 
 class Engine(object):
@@ -25,37 +29,47 @@ class Engine(object):
         self.scheduler = Scheduler()
         self.downloader = Downloader()
         self.pipeline = Pipeline()
+        self.builder_mid = BuilderMiddleware()
+        self.downloader_mid = DownloaderMiddleware()
 
     def start(self):
         """
         启动引擎
         """
 
+        start = time.time()
+        cf.print_log('引擎启动！')
         self._start_engine()
+        cf.print_log('引擎关闭！')
+        cf.print_log('耗时%s秒！' % round(time.time() - start, 2))
 
     def _start_engine(self):
         """
         依次调用其他组件对外提供的接口，实现整个框架的运作
         """
 
-        # 1.建造模块发出初始请求
+        # 1.建造器发出初始请求
         start_request = self.builder.start_requests()
 
         # 2.把初始请求添加给调度器
+        start_request = self.builder_mid.process_request(start_request)  # 请求预处理
         self.scheduler.add_request(start_request)
 
         # 3.从调度器获取请求对象，交给下载器发起请求，获取一个响应对象
         request = self.scheduler.get_request()
 
         # 4.利用下载器发起请求
+        request = self.downloader_mid.process_request(request)  # 请求预处理
         response = self.downloader.get_response(request)
 
         # 5.利用建造器的解析响应的方法，处理响应，得到结果
+        response = self.downloader_mid.process_response(response)  # 响应预处理
         result = self.builder.parse(response)
 
         # 6.判断结果对象
         # 6.1 请求对象交给调度器处理
         if isinstance(result, Request):
+            result = self.builder_mid.process_request(result)  # 请求预处理
             self.scheduler.add_request(result)
 
         # 6.2 数据对象交给管道处理

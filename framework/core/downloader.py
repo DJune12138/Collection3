@@ -14,8 +14,8 @@ class Downloader(object):
     def get_response(self, request):
         """
         发起请求获取响应
-        :param request:(type=[Request]) 即将发起请求的请求对象
-        :return response:(type=[Response]) 发起请求后获得的响应对象
+        :param request:(type=Request) 即将发起请求的请求对象
+        :return response:(type=Response) 发起请求后获得的响应对象
         """
 
         # 1.根据请求对象，发起请求，获取响应

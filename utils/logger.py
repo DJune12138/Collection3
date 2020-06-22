@@ -1,0 +1,130 @@
+"""
+利用logging模块封装日志器
+
+fmt格式说明：
+%(name)s Logger的名字
+%(levelno)s 数字形式的日志级别
+%(levelname)s 文本形式的日志级别
+%(pathname)s 调用日志输出函数的模块的完整路径名，可能没有
+%(filename)s 调用日志输出函数的模块的文件名
+%(module)s 调用日志输出函数的模块名
+%(funcName)s 调用日志输出函数的函数名
+%(lineno)d 调用日志输出函数的语句所在的代码行
+%(created)f 当前时间，用UNIX标准的表示时间的浮点数表示
+%(relativeCreated)d 输出日志信息时的，自Logger创建以来的毫秒数
+%(asctime)s 字符串形式的当前时间，默认格式是 “2020-06-22 16:49:45,896”，逗号后面的是毫秒
+%(thread)d 线程ID，可能没有
+%(threadName)s 线程名，可能没有
+%(process)d 进程ID，可能没有
+%(message)s 用户输出的消息
+
+datefmt格式说明：
+%y 两位数的年份表示（00-99）
+%Y 四位数的年份表示（000-9999）
+%m 月份（01-12）
+%d 月内中的一天（0-31）
+%H 24小时制小时数（0-23）
+%I 12小时制小时数（01-12）
+%M 分钟数（00=59）
+%S 秒（00-59）
+%a 本地简化星期名称
+%A 本地完整星期名称
+%b 本地简化的月份名称
+%B 本地完整的月份名称
+%c 本地相应的日期表示和时间表示
+%j 年内的一天（001-366）
+%p 本地A.M.或P.M.的等价符
+%U 一年中的星期数（00-53）星期天为星期的开始
+%w 星期（0-6），星期天为星期的开始
+%W 一年中的星期数（00-53）星期一为星期的开始
+%x 本地相应的日期表示
+%X 本地相应的时间表示
+%Z 当前时区的名称
+%% %号本身
+"""
+
+import os
+import time
+import logging
+
+
+class Logger(object):
+    """
+    日志器
+    """
+
+    def __init__(self, level='warning', fmt='%(asctime)s %(filename)s [line:%(lineno)d] %(levelname)s: %(message)s',
+                 date_fmt='%Y-%m-%d %H:%M:%S', log_path='log', log_name=time.strftime('%Y%m%d')):
+        """
+        初始配置
+        :param level:(type=str) 日志等级，默认WARNING等级
+        :param fmt:(type=str) 日志格式，有默认格式
+        :param date_fmt:(type=str) 时间格式，有默认格式
+        :param log_path:(type=str) 存放日志的路径，默认当前路径下的log文件夹
+        :param log_name:(type=str) 日志文件名称，默认以当天时间命名
+        """
+
+        # 获取一个logger对象
+        self._logger = logging.getLogger()
+
+        # 设置format对象
+        self.formatter = logging.Formatter(fmt=fmt, datefmt=date_fmt)
+
+        # 设置文件日志模式
+        self.log_path = log_path
+        self._logger.addHandler(self._get_file_handler(log_name))
+
+        # 设置终端日志模式
+        self._logger.addHandler(self._get_console_handler())
+
+        # 设置日志等级
+        self._logger.setLevel(getattr(logging, level.upper()))
+
+    def _get_file_handler(self, filename):
+        """
+        返回一个文件日志handler
+        :param filename:(type=str) 日志文件名
+        :return file_handler:(type=FileHandler) 文件日志模式对象
+        """
+
+        # 构建日志路径，如文件夹不存在，则创建
+        if not os.path.isdir(self.log_path):
+            try:
+                os.makedirs(self.log_path)
+            except FileExistsError:
+                pass
+        log_path = os.path.join(self.log_path, filename)
+
+        # 获取一个文件日志handler
+        file_handler = logging.FileHandler(filename=log_path, encoding='utf-8')
+
+        # 设置日志格式
+        file_handler.setFormatter(self.formatter)
+
+        # 返回
+        return file_handler
+
+    def _get_console_handler(self):
+        """
+        返回一个终端日志handler
+        :return console_handler:(type=StreamHandler) 终端日志模式对象
+        """
+
+        # 获取一个输出到终端日志handler
+        console_handler = logging.StreamHandler()
+
+        # 设置日志格式
+        console_handler.setFormatter(self.formatter)
+
+        # 返回
+        return console_handler
+
+    @property
+    def logger(self):
+        """
+        返回日志器对象
+        :return log:(type=RootLogger) 日志器对象
+        """
+
+        log = self._logger
+        return log

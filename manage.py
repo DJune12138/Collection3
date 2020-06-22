@@ -6,22 +6,23 @@
 
 import argparse
 import importlib
-import config
+from config import *
+from utils.logger import Logger
 
 # 获取脚本传参
-parser = argparse.ArgumentParser(description=config.description)
-for parser_dict in config.all_parser.values():
+parser = argparse.ArgumentParser(description='欢迎使用数据采集通用框架（版本号：%s）！详细使用方法请查看README。' % version)
+for parser_dict in p_parser.values():
     for parser_name, parser_setting in parser_dict.items():
-        parser.add_argument('-' + parser_setting['simple'], '--' + parser_name, metavar=parser_name,
-                            help=parser_setting['help'])
+        parser.add_argument('-' + parser_setting[pk_simple], '--' + parser_name, metavar=parser_name,
+                            help=parser_setting[pk_help])
 args = parser.parse_args()
 
 # 校验传参
 # 主参数，有且仅有一个
 main_num = 0
-main_list = config.all_parser['main'].keys()
+main_list = p_parser[pk_main].keys()
 main_key = ''
-for parser_name in config.all_parser['main'].keys():
+for parser_name in main_list:
     if getattr(args, parser_name.replace('-', '_')) is not None:
         main_num += 1
         if not main_key:
@@ -32,12 +33,25 @@ if main_num != 1:
 # 导入自定义模块
 args_name = getattr(args, main_key.replace('-', '_'))
 try:
-    m = importlib.import_module('%s.%s.%s.%s' % (config.business_name, config.all_parser['main'][main_key]['module'],
-                                                 args_name, args_name))
+    m = importlib.import_module(
+        '%s.%s.%s.%s' % (business_name, p_parser[pk_main][main_key][pk_module], args_name, args_name))
 except ModuleNotFoundError:
     raise ModuleNotFoundError('%s为%s的模块不存在，请检查目录结构是否正确！' % (main_key, args_name))
 
+# 获取日志器
+lc = dict()
+for k, v in logger_config.items():
+    if v is not None:
+        lc[k] = v
+logger = Logger(**lc).logger
+
+# 构建配置字典
+config_dict = {
+    'args': args,  # 脚本传参
+    'logger': logger  # 日志器
+}
+
 # 运行模块
 if __name__ == '__main__':
-    obj = getattr(m, config.all_parser['main'][main_key]['object'])(args)
+    obj = getattr(m, p_parser[pk_main][main_key][pk_object])(config_dict)
     obj.run()

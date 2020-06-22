@@ -5,21 +5,26 @@
 
 目录架构：
 -- collection
-  -- business                 --> 业务代码
-  -- framework                --> 框架代码
-    -- core                   --> 核心组件
-      -- builder.py           --> 建造器组件
-      -- downloader.py        --> 下载器组件
-      -- engine.py            --> 引擎组件
-      -- pipeline.py          --> 管道组件
-      -- scheduler.py         --> 调度器组件
-    -- object                 --> 内置对象
-      -- item.py              --> 数据对象
-      -- request.py           --> 请求对象
-      -- response.py          --> 响应对象
-  -- utils                    --> 工具包
-  -- config.py                --> 项目配置
-  -- manage.py                --> 项目入口
+  -- business                      --> 业务代码
+  -- framework                     --> 框架代码
+    -- core                        --> 核心组件
+      -- builder.py                --> 建造器组件
+      -- downloader.py             --> 下载器组件
+      -- engine.py                 --> 引擎组件
+      -- pipeline.py               --> 管道组件
+      -- scheduler.py              --> 调度器组件
+    -- middlewares                 --> 中间件
+      -- builder_middlewares.py    --> 建造器中间件
+      -- downloader_middlewares.py --> 下载器中间件
+    -- object                      --> 内置对象
+      -- item.py                   --> 数据对象
+      -- request.py                --> 请求对象
+      -- response.py               --> 响应对象
+  -- utils                         --> 工具包
+    -- common_function.py          --> 非业务公共函数
+    -- logger.py                   --> 日志器
+  -- config.py                     --> 项目配置
+  -- manage.py                     --> 项目入口
 
 
 

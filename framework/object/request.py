@@ -11,7 +11,7 @@ class Request(object):
     def __init__(self, collect_way):
         """
         初始配置
-        :param collect_way:(type=[str]) 数据采集方式，限定“web”（获取网络数据）或“db”（获取数据库数据）
+        :param collect_way:(type=str) 数据采集方式，限定“web”（获取网络数据）或“db”（获取数据库数据）
         """
 
         self.collect_way = collect_way
