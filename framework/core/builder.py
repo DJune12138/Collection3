@@ -13,8 +13,15 @@ class Builder(object):
     建造器组件
     """
 
+    # 建造器名称
+    # 继承类后重写该属性即可
+    # 用于识别业务，每个业务应为唯一名称，必须使用字符串
+    name = ''
+
     # 默认初始请求
-    start = 'web'
+    # 继承类后重写该属性即可
+    # 目前只有start_requests方法会调用该属性，如继承类后重写了start_requests方法，可以不需要该属性
+    start = []
 
     def start_requests(self):
         """
@@ -22,8 +29,9 @@ class Builder(object):
         :return request:(type=Request) 初始请求对象
         """
 
-        request = Request(self.start)
-        return request
+        for one in self.start:
+            request = Request(one)
+            yield request
 
     def parse(self, response):
         """
@@ -32,6 +40,5 @@ class Builder(object):
         :return item:(type=Item) 分析处理后的数据对象
         """
 
-        # TODO 后续会根据解析返回request对象
         item = Item(response)
-        return item
+        yield item

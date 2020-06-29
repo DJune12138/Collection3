@@ -10,7 +10,7 @@ from config import *
 from utils.logger import Logger
 
 # 获取脚本传参
-parser = argparse.ArgumentParser(description='欢迎使用数据采集通用框架（版本号：%s）！详细使用方法请查看README。' % version)
+parser = argparse.ArgumentParser(description='欢迎使用数据采集通用框架！详细使用方法请查看README。')
 for parser_dict in p_parser.values():
     for parser_name, parser_setting in parser_dict.items():
         parser.add_argument('-' + parser_setting[pk_simple], '--' + parser_name, metavar=parser_name,
@@ -53,5 +53,5 @@ config_dict = {
 
 # 运行模块
 if __name__ == '__main__':
-    obj = getattr(m, p_parser[pk_main][main_key][pk_object])(config_dict)
+    obj = getattr(m, p_parser[pk_main][main_key][pk_gc])(config_dict)
     obj.run()
