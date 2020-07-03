@@ -23,6 +23,8 @@ class Downloader(object):
             print('start web')
         elif request.collect_way.lower() == 'db':
             print('start db')
+        elif request.collect_way.lower() == 'test':
+            print('这是一个彩蛋๑乛◡乛๑，业务名称为%s。' % request.builder_name)
         else:
             raise ValueError('collect_way只能为“web”（获取网络数据）或“db”（获取数据库数据）！')
 

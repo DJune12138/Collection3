@@ -11,8 +11,10 @@ class Pipeline(object):
 
     def process_item(self, item):
         """
-        处理item对象
-        :param item:(type=item) 建造器交过来的数据对象
+        1.处理数据对象
+        2.继承后，可重写该方法，自行编写获取到数据后的业务逻辑
+        3.重写该方法必须要接收一个参数（无论业务使用与否），是数据对象
+        :param item:(type=item) 建造器通过引擎交过来的数据对象
         """
 
         print('item: ', item)

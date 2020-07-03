@@ -16,6 +16,15 @@ class Item(object):
 
         self._data = data
 
+    def __str__(self):
+        """
+        对象描述信息
+        :return info:(type=str) 对象描述信息
+        """
+
+        info = '我是内置数据对象'
+        return info
+
     @property
     def data(self):
         """

@@ -13,6 +13,9 @@
       -- engine.py                 --> 引擎组件
       -- pipeline.py               --> 管道组件
       -- scheduler.py              --> 调度器组件
+    -- error                       --> 自定义异常类
+      -- __init__.py                --> 基类
+      -- error.py                  --> 自定义异常类
     -- middlewares                 --> 中间件
       -- builder_middlewares.py    --> 建造器中间件
       -- downloader_middlewares.py --> 下载器中间件

@@ -2,8 +2,6 @@
 得到的（日志）数据封装成响应对象（response）
 """
 
-import json
-
 
 class Response(object):
     """
@@ -18,13 +16,11 @@ class Response(object):
 
         self.meta = meta
 
-    @property
-    def json(self):
+    def __str__(self):
         """
-        解析响应对象的json字符串
-        :return py_obj:(type=dict,list) 解析响应对象的json字符串，转为python对象
+        对象描述信息
+        :return info:(type=str) 对象描述信息
         """
 
-        # py_obj = json.loads(self.body)  # TODO 待完善
-        py_obj = {}
-        return py_obj
+        info = '我是内置响应对象'
+        return info

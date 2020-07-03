@@ -1,5 +1,5 @@
 """
-请求（日志）数据的方式封装成请求对象（request）
+请求数据的方式封装成请求对象（request）
 """
 
 
@@ -19,3 +19,12 @@ class Request(object):
         self.collect_way = collect_way
         self.parse = parse
         self.meta = meta
+
+    def __str__(self):
+        """
+        对象描述信息
+        :return info:(type=str) 对象描述信息
+        """
+
+        info = '我是内置请求对象'
+        return info
