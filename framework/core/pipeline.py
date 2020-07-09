@@ -17,4 +17,4 @@ class Pipeline(object):
         :param item:(type=item) 建造器通过引擎交过来的数据对象
         """
 
-        print('item: ', item)
+        print('item:', item)

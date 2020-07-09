@@ -6,6 +6,7 @@
 
 import time
 import sys
+import os
 from importlib import import_module
 from types import GeneratorType
 from multiprocessing.dummy import Pool
@@ -21,6 +22,7 @@ from framework.middlewares.downloader_middlewares import DownloaderMiddleware
 from framework.error.error import TypeDifferent, FaultReturn, ArgumentNumError
 from utils import common_function as cf
 from config import *
+from services import logger, main_key
 
 
 class Engine(object):
@@ -33,85 +35,90 @@ class Engine(object):
         初始配置
         """
 
-        # 初始化开始
-        cf.print_log('引擎初始化...')
-        self.start_time = time.time()
-
         # 组件、中间件初始化
-        self.builders = dict()  # 建造器
-        self.scheduler = Scheduler()  # 调度器
-        self.downloader = Downloader()  # 下载器
-        self.pipelines = dict()  # 管道
-        self.builder_mws = dict()  # 建造器中间件
-        self.downloader_mws = dict()  # 下载器中间件
         try:
+            self.builders = dict()  # 建造器
+            self.scheduler = Scheduler()  # 调度器
+            self.downloader = Downloader()  # 下载器
+            self.pipelines = dict()  # 管道
+            self.builder_mws = dict()  # 建造器中间件
+            self.downloader_mws = dict()  # 下载器中间件
             self._init_all()
+            self.builders_num = len(self.builders)
+
+            # 如果没开启任何业务，则可以直接关闭程序，防止引擎启动后卡死
+            if self.builders_num == 0:
+                cf.print_log('没有获取到任何业务，引擎关闭！')
+                sys.exit()
+
+            # 请求与响应统计
+            self.total_request_nums = 0
+            self.total_response_nums = 0
+            self.total_error_nums = 0
+
+            # 异步任务相关
+            self.pool = Pool()  # 进程池
+            self.is_running = False  # 判断引擎是否可以关闭的标志
+
+            # 警告语模板
+            total_warning = '详情请查看框架内相关类的说明'
+            self.fr_warning = '业务建造器（{}）回调函数（{}）没有使用关键字yield，请规范写法，%s。' % total_warning
+            self.td_warning = '业务（{}）继承重写的方法没有返回正确的内置对象，请规范写法，%s。' % total_warning
+            self.ane_warning = '业务（{}）继承重写的方法没有接收正确数量的传参，请规范写法，%s。' % total_warning
+            self.b_warning = '业务级错误！业务名称为{}。'
+
+        # 初始化失败
         except Exception:
-            cf.print_log('框架级错误！引擎初始化失败！')  # TODO 日志器
+            logger.exception('框架级错误！引擎初始化失败！')
             sys.exit()
-        self.builders_num = len(self.builders)
-
-        # 如果没开启任何业务，则可以直接关闭程序，防止引擎启动后卡死
-        if self.builders_num == 0:
-            cf.print_log('没有在配置config中的F_builders开启任何业务，引擎关闭！')
-            sys.exit()
-
-        # 请求与响应统计
-        self.total_request_nums = 0
-        self.total_response_nums = 0
-        self.total_error_nums = 0
-
-        # 异步任务相关
-        self.pool = Pool()  # 进程池
-        self.is_running = False  # 判断引擎是否可以关闭的标志
-
-        # 警告语模板
-        total_warning = '详情请查看框架内相关类的说明'
-        self.fr_warning = '业务建造器（{}）回调函数（{}）没有使用关键字yield，请规范写法，%s。' % total_warning
-        self.td_warning = '业务（{}）继承重写的方法没有返回正确的内置对象，请规范写法，%s。' % total_warning
-        self.ane_warning = '业务（{}）继承重写的方法没有接收正确数量的传参，请规范写法，%s。' % total_warning
-        self.b_warning = '业务级错误！业务名称为{}。'
 
     def _init_all(self):
         """
-        把在config配置的业务初始化为引擎能用的格式
+        把通过脚本传参开启的业务初始化为引擎能用的格式
         """
 
         # 默认对象
-        # 默认对象是完全一样功能的对象，无需每循环一个就开辟一个内存，在循环前先创建
+        # 默认对象是完全一样功能的对象，无需每循环一个就开辟一块内存，在循环前先创建
         pipeline = Pipeline()  # 默认管道
         builder_mw = BuilderMiddleware()  # 默认建造器中间件
         downloader_mw = DownloaderMiddleware()  # 默认下载器中间件
 
         # 1.校验并添加业务建造器
-        # 业务建造器是整个业务最重要的组件，其中一环的校验没通过都将跳过该业务
-        for type_, code_list in F_builders.items():
-            code_list = set(code_list)
-            for code in code_list:
+        # 业务建造器是整个业务最重要的组件，其中一步校验没通过都将跳过该业务
+        # 主参数为*，会把对应模块下所有业务都开启
+        # 注意，如果为*，引擎会把该模块下所有文件（夹）名称作为code，请不要把无关文件（夹）放在对应模块下
+        for type_, codes in main_key.items():
+            module_name = p_parser[pk_main][type_][pk_module]
+            code_list = os.listdir('%s/%s' % (business_name, module_name)) if codes == '*' else codes.split(',')
 
-                # 1.1 校验模块
+            # 1.1 校验模块
+            for code in set(code_list):
                 try:
-                    m = import_module('%s.%s.%s.%s' % (business_name, p_parser[pk_main][type_][pk_module], code, code))
+                    m = import_module('%s.%s.%s.%s' % (business_name, module_name, code, code))
                 except ModuleNotFoundError:
-                    cf.print_log('%s为%s的模块不存在，请检查目录结构是否正确！' % (type_, code))  # TODO 日志器
+                    logger.exception('%s为%s的模块不存在，请检查目录结构是否正确！如使用*，请不要把无关文件（夹）放在对应模块下！' % (type_, code))
                     continue
 
                 # 1.2 校验建造器规范
                 try:
                     obj = getattr(m, p_parser[pk_main][type_][pk_builder])
                 except AttributeError:
-                    cf.print_log('%s为%s的模块下没找到根据config配置的建造器类名%s，请规范写法。' % (
-                        type_, code, p_parser[pk_main][type_][pk_builder]))  # TODO 日志器
+                    logger.exception('%s为%s的模块下没找到根据config配置的建造器类名%s，请规范写法。' % (
+                        type_, code, p_parser[pk_main][type_][pk_builder]))
                     continue
                 obj_name = obj.name  # 建造器名称（业务名称）
                 if not issubclass(obj, Builder):  # 校验是否继承内置建造器
-                    cf.print_log('业务建造器（%s）没有继承内置建造器，请规范写法。' % obj_name)  # TODO 日志器
+                    logger.exception('业务建造器（%s）没有继承内置建造器，请规范写法。' % obj_name)
                     continue
 
                 # 1.3 校验业务名称唯一性
-                if self.builders.get(obj_name) is not None or not obj_name or not isinstance(obj_name, str):
-                    cf.print_log('%s为%s的模块下的建造器对象%s的name属性（%s）与其他业务重复或不为字符串类型，name属性识别对应业务，必须是唯一值！' % (
-                        type_, code, p_parser[pk_main][type_][pk_module], obj_name))  # TODO 日志器
+                if obj_name == '':
+                    logger.exception('%s为%s的模块下的建造器对象%s没有name属性，name属性识别对应业务，必须有且是唯一值！' % (
+                        type_, code, p_parser[pk_main][type_][pk_builder]))
+                    continue
+                elif self.builders.get(obj_name) is not None or not isinstance(obj_name, str):
+                    logger.exception('%s为%s的模块下的建造器对象%s的name属性（%s）与其他业务重复或不为字符串类型，name属性识别对应业务，必须有且是唯一值！' % (
+                        type_, code, p_parser[pk_main][type_][pk_builder], obj_name))
                     continue
 
                 # 1.4 全部校验通过，添加业务建造器
@@ -129,7 +136,7 @@ class Engine(object):
                         self.pipelines[obj_name] = obj()
                     else:
                         self.pipelines[obj_name] = pipeline
-                        cf.print_log('业务管道（%s）没有继承内置管道，已更换成默认管道！请规范写法。' % obj_name)  # TODO 日志器
+                        logger.exception('业务管道（%s）没有继承内置管道，已更换成默认管道！请规范写法。' % obj_name)
 
                 # 3.添加业务建造器中间件
                 try:
@@ -141,7 +148,7 @@ class Engine(object):
                         self.builder_mws[obj_name] = obj()
                     else:
                         self.builder_mws[obj_name] = builder_mw
-                        cf.print_log('业务建造器中间件（%s）没有继承内置建造器中间件，已更换成默认建造器中间件！请规范写法。')  # TODO 日志器
+                        logger.exception('业务建造器中间件（%s）没有继承内置建造器中间件，已更换成默认建造器中间件！请规范写法。')
 
                 # 4.添加业务下载器中间件
                 try:
@@ -153,7 +160,7 @@ class Engine(object):
                         self.downloader_mws[obj_name] = obj()
                     else:
                         self.downloader_mws[obj_name] = downloader_mw
-                        cf.print_log('业务下载器中间件（%s）没有继承内置下载器中间件，已更换成默认下载器中间件！请规范写法。')  # TODO 日志器
+                        logger.exception('业务下载器中间件（%s）没有继承内置下载器中间件，已更换成默认下载器中间件！请规范写法。')
 
     def _call_back(self, temp):
         """
@@ -175,7 +182,7 @@ class Engine(object):
         try:
             raise exception  # 抛出异常后，才能被日志进行完整记录下来
         except Exception:
-            cf.print_log('框架级错误！')  # TODO 日志器
+            logger.exception('框架级错误！引擎原地爆炸！')
 
     @staticmethod
     def _check_return(obj, right_obj=GeneratorType):
@@ -210,8 +217,6 @@ class Engine(object):
                 raise ArgumentNumError
             else:
                 raise e
-        except Exception as e:
-            raise e
         else:
             return result
 
@@ -261,13 +266,13 @@ class Engine(object):
 
             # 处理异常
             except FaultReturn:  # 校验yield不通过
-                cf.print_log(self.fr_warning.format(builder_name, 'start_requests'))  # TODO 日志器
+                logger.exception(self.fr_warning.format(builder_name, 'start_requests'))
             except TypeDifferent:  # 校验类型不通过
-                cf.print_log(self.td_warning.format(builder_name))  # TODO 日志器
+                logger.exception(self.td_warning.format(builder_name))
             except ArgumentNumError:  # 校验函数传参不通过
-                cf.print_log(self.ane_warning.format(builder_name))  # TODO 日志器
+                logger.exception(self.ane_warning.format(builder_name))
             except Exception:  # 其他业务级错误
-                cf.print_log(self.b_warning.format(builder_name))  # TODO 日志器
+                logger.exception(self.b_warning.format(builder_name))
 
     def _execute_request_response_item(self):
         """
@@ -310,16 +315,16 @@ class Engine(object):
         # 无论是正常执行还是报错，都需要完成响应，否则引擎会一直卡死
         except FaultReturn:
             self.total_error_nums += 1
-            cf.print_log(self.fr_warning.format(builder_name, parse_name))  # TODO 日志器
+            logger.exception(self.fr_warning.format(builder_name, parse_name))
         except TypeDifferent:
             self.total_error_nums += 1
-            cf.print_log(self.td_warning.format(builder_name))  # TODO 日志器
+            logger.exception(self.td_warning.format(builder_name))
         except ArgumentNumError:
             self.total_error_nums += 1
-            cf.print_log(self.ane_warning.format(builder_name))  # TODO 日志器
+            logger.exception(self.ane_warning.format(builder_name))
         except Exception:
             self.total_error_nums += 1
-            cf.print_log(self.b_warning.format(builder_name))  # TODO 日志器
+            logger.exception(self.b_warning.format(builder_name))
         finally:
             self.total_response_nums += 1
 
@@ -354,14 +359,10 @@ class Engine(object):
         启动引擎
         """
 
-        start = time.time()
-        cf.print_log('引擎初始化完成，启动！')
-        cf.print_log('引擎初始化耗时%s秒！' % (round(time.time() - start, 2)))
         try:
             self._start_engine()
         except Exception:
-            cf.print_log('框架级错误！')  # TODO 日志器
-        cf.print_log('引擎关闭！')
-        cf.print_log('业务耗时%s秒，总共完成业务%s个！请求%s个，完成响应%s个，其中错误%s个！' % (
-            round(time.time() - start, 2), self.builders_num, self.total_request_nums, self.total_response_nums,
-            self.total_error_nums))
+            logger.exception('框架级错误！引擎原地爆炸！')
+            sys.exit()
+        cf.print_log('总共完成业务%s个！添加请求%s个，完成响应%s个，其中错误响应%s个！' % (
+            self.builders_num, self.total_request_nums, self.total_response_nums, self.total_error_nums))
