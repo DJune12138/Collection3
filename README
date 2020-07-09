@@ -4,7 +4,7 @@
 
 
 目录架构：
--- collection
+-- Collection3
   -- business                      --> 业务代码
   -- framework                     --> 框架代码
     -- core                        --> 核心组件
