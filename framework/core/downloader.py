@@ -4,6 +4,7 @@
 """
 
 from framework.object.response import Response
+from framework.error.check_error import ParameterError
 
 
 class Downloader(object):
@@ -20,13 +21,13 @@ class Downloader(object):
 
         # 1.根据请求对象，发起请求，获取响应
         if request.collect_way.lower() == 'web':
-            print('start web')
+            pass
         elif request.collect_way.lower() == 'db':
-            print('start db')
+            pass
         elif request.collect_way.lower() == 'test':
             print('这是一个彩蛋๑乛◡乛๑，业务名称为%s。' % request.builder_name)
         else:
-            raise ValueError('collect_way只能为“web”（获取网络数据）或“db”（获取数据库数据）！')
+            raise ParameterError('collect_way', ['“web”（获取网络数据）', '“db”（获取数据库数据）'])
 
         # 2.构建响应对象，并返回
         response = Response()

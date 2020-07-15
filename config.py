@@ -8,6 +8,9 @@
 # 业务模块名称
 business_name = 'business'
 
+# 存放账号信息模块的名称
+account_name = 'account'
+
 # 脚本参数相关
 pe_main = '该参数为主参数，有且仅有一个！'  # 主参数通用说明
 pe_extra = '该参数为额外参数，可选，在某些业务可能是必选参数！'

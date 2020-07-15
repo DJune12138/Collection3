@@ -19,7 +19,6 @@ class BuilderMiddleware(object):
         :return request:(type=Request) 加工后的请求对象
         """
 
-        print('这是建造器中间件process_request方法')
         request = request
         return request
 
@@ -33,6 +32,5 @@ class BuilderMiddleware(object):
         :return response:(type=Response) 加工后的响应对象
         """
 
-        print('这是建造器中间件process_response方法')
         response = response
         return response

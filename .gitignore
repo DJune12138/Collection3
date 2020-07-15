@@ -2,3 +2,4 @@
 *.py[cod]
 *log/
 play.py
+account/*.json

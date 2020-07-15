@@ -12,7 +12,7 @@ class Scheduler(object):
     """
 
     def __init__(self):
-        self.queue = Queue()
+        self.__queue = Queue()
 
     def add_request(self, request):
         """
@@ -20,7 +20,7 @@ class Scheduler(object):
         :param request:(type=Request) 初始请求对象
         """
 
-        self.queue.put(request)
+        self.__queue.put(request)
 
     def get_request(self):
         """
@@ -29,7 +29,7 @@ class Scheduler(object):
         """
 
         try:
-            request = self.queue.get(block=False)  # 设置为非阻塞
+            request = self.__queue.get(block=False)  # 设置为非阻塞
         except Empty:  # 获取为空会抛异常，返回None
             return None
         else:

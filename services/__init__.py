@@ -4,7 +4,9 @@
 
 # 脚本传参
 argv = None
-main_key = dict()  # 引擎用，用于记录开启哪一块的业务
 
 # 日志器
 logger = None
+
+# MySQL数据库连接池
+mysql = None

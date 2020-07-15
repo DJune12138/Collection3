@@ -53,8 +53,7 @@ class Logger(object):
     日志器
     """
 
-    def __init__(self, level='warning', fmt='%(asctime)s %(filename)s [line:%(lineno)d] %(levelname)s: %(message)s',
-                 date_fmt='%Y-%m-%d %H:%M:%S', log_path='log', log_name=time.strftime('%Y%m%d')):
+    def __init__(self, level='warning', fmt=None, date_fmt=None, log_path='log', log_name=None):
         """
         初始配置
         :param level:(type=str) 日志等级，默认WARNING等级
@@ -65,22 +64,29 @@ class Logger(object):
         """
 
         # 获取一个logger对象
-        self._logger = logging.getLogger()
+        self.__logger = logging.getLogger()
 
         # 设置format对象
-        self.formatter = logging.Formatter(fmt=fmt, datefmt=date_fmt)
+        if fmt is None:
+            fmt = '%(asctime)s %(filename)s [line:%(lineno)d] %(levelname)s: %(message)s'
+        if date_fmt is None:
+            date_fmt = '%Y-%m-%d %H:%M:%S'
+        self.__file_formatter = logging.Formatter(fmt='\n\n\n' + fmt, datefmt=date_fmt)
+        self.__console_formatter = logging.Formatter(fmt=fmt, datefmt=date_fmt)
 
         # 设置文件日志模式
-        self.log_path = log_path
-        self._logger.addHandler(self._get_file_handler(log_name))
+        if log_name is None:
+            log_name = time.strftime('%Y%m%d')
+        self.__log_path = log_path
+        self.__logger.addHandler(self.__get_file_handler(log_name))
 
         # 设置终端日志模式
-        self._logger.addHandler(self._get_console_handler())
+        self.__logger.addHandler(self.__get_console_handler())
 
         # 设置日志等级
-        self._logger.setLevel(getattr(logging, level.upper()))
+        self.__logger.setLevel(getattr(logging, level.upper()))
 
-    def _get_file_handler(self, filename):
+    def __get_file_handler(self, filename):
         """
         返回一个文件日志handler
         :param filename:(type=str) 日志文件名
@@ -88,23 +94,23 @@ class Logger(object):
         """
 
         # 构建日志路径，如文件夹不存在，则创建
-        if not os.path.isdir(self.log_path):
+        if not os.path.isdir(self.__log_path):
             try:
-                os.makedirs(self.log_path)
+                os.makedirs(self.__log_path)
             except FileExistsError:
                 pass
-        log_path = os.path.join(self.log_path, filename)
+        log_path = os.path.join(self.__log_path, filename)
 
         # 获取一个文件日志handler
         file_handler = logging.FileHandler(filename=log_path, encoding='utf-8')
 
         # 设置日志格式
-        file_handler.setFormatter(self.formatter)
+        file_handler.setFormatter(self.__file_formatter)
 
         # 返回
         return file_handler
 
-    def _get_console_handler(self):
+    def __get_console_handler(self):
         """
         返回一个终端日志handler
         :return console_handler:(type=StreamHandler) 终端日志模式对象
@@ -114,7 +120,7 @@ class Logger(object):
         console_handler = logging.StreamHandler()
 
         # 设置日志格式
-        console_handler.setFormatter(self.formatter)
+        console_handler.setFormatter(self.__console_formatter)
 
         # 返回
         return console_handler
@@ -126,5 +132,5 @@ class Logger(object):
         :return log:(type=RootLogger) 日志器对象
         """
 
-        log = self._logger
+        log = self.__logger
         return log

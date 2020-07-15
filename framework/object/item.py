@@ -14,7 +14,7 @@ class Item(object):
         :param data:(type=Request,Response) 构造器解析后的数据
         """
 
-        self._data = data
+        self.__data = data
 
     def __str__(self):
         """
@@ -32,5 +32,5 @@ class Item(object):
         :return data:(type=Request,Response) 构造器解析后的数据
         """
 
-        data = self._data
+        data = self.__data
         return data

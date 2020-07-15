@@ -5,6 +5,7 @@
 
 目录架构：
 -- Collection3
+  -- account                       --> 存放各类服务的连接信息
   -- business                      --> 业务代码
   -- framework                     --> 框架代码
     -- core                        --> 核心组件
@@ -15,7 +16,7 @@
       -- scheduler.py              --> 调度器组件
     -- error                       --> 自定义异常类
       -- __init__.py               --> 基类
-      -- error.py                  --> 自定义异常类
+      -- check_error.py            --> 校验不通过的异常类
     -- middlewares                 --> 中间件
       -- builder_middlewares.py    --> 建造器中间件
       -- downloader_middlewares.py --> 下载器中间件
@@ -29,6 +30,7 @@
   -- utils                         --> 工具包
     -- common_function.py          --> 非业务公共函数
     -- logger.py                   --> 日志器
+    -- mysql.py                    --> MySQL数据库连接池
   -- config.py                     --> 项目配置
   -- main.py                       --> 项目入口
 
