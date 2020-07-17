@@ -20,7 +20,7 @@ from framework.object.response import Response
 from framework.object.item import Item
 from framework.middlewares.builder_middlewares import BuilderMiddleware
 from framework.middlewares.downloader_middlewares import DownloaderMiddleware
-from framework.error.check_error import TypeDifferent, FaultReturn, ArgumentNumError, ParameterError, CheckUnPass
+from framework.error.check_error import *
 from utils import common_function as cf
 from config import *
 from services import logger, argv
@@ -68,8 +68,9 @@ class Engine(object):
             total_warning = '，请规范写法，详情请查看框架内相关类的说明。'
             self.__fr_warning = '业务建造器（{}）回调函数（{}）没有使用关键字yield%s' % total_warning
             self.__td_warning = '业务（{}）继承重写的方法没有返回正确的内置对象%s' % total_warning
-            self.__ane_warning = '业务（{}）继承重写的方法没有接收正确数量的传参%s' % total_warning
+            self.__ane_warning = '业务（{}）继承重写的方法没有接收正确数量的传参或参数名错误%s' % total_warning
             self.__pe_warning = '业务（{}）下载器获取到的请求对象参数不正确%s' % total_warning
+            self.__pue_warning = '业务（{}）组件里没有parse参数对应的解析函数%s' % total_warning
             self.__b_warning = '业务级错误！业务名称为{}。'
             self.__f_exception = '框架级错误！引擎原地爆炸！'
 
@@ -210,7 +211,7 @@ class Engine(object):
             if right_obj == GeneratorType:  # yield问题返回yield相关异常
                 raise FaultReturn
             else:
-                raise TypeDifferent(right_obj)
+                raise TypeDifferent([right_obj])
 
     @staticmethod
     def __check_argument(func, *args):
@@ -230,6 +231,22 @@ class Engine(object):
                 raise e
         else:
             return result
+
+    @staticmethod
+    def __check_parse(core, parse):
+        """
+        用于校验业务组件中解析函数的函数名是否正确，校验通过则返回函数引用，校验不通过则抛异常
+        :param core:(type=业务组件) 业务组件对象
+        :param parse:(type=str) 函数名
+        :return func:(type=function) 函数引用
+        """
+
+        try:
+            func = getattr(core, parse)
+        except AttributeError:
+            raise ParseUnExist
+        else:
+            return func
 
     def __statistics_lock(self, type_):
         """
@@ -317,7 +334,7 @@ class Engine(object):
             logger.exception(self.__f_exception)
             return
 
-            # 4.调用下载器，获取响应对象
+        # 4.调用下载器，获取响应对象
         try:
             downloader_mw = self.__downloader_mws[builder_name]
             request = self.__check_return(self.__check_argument(
@@ -330,19 +347,29 @@ class Engine(object):
             # 5.调用建造器，解析响应对象
             response = self.__check_return(self.__check_argument(
                 self.__builder_mws[builder_name].process_response, response), right_obj=Response)  # 建造器响应处理
-            response_list = self.__check_return(self.__check_argument(
-                getattr(self.__builders[builder_name], parse_name), response))
+            response_list = self.__check_return(
+                self.__check_argument(self.__check_parse(self.__builders[builder_name], parse_name), response))
 
             # 6.根据响应对象类型，把该对象添加至调度器或交给管道
             for result in response_list:
+                pipeline_result = None
                 if isinstance(result, Request):
                     self.__add_request(result, builder_name)
                 elif isinstance(result, Item):
-                    self.__check_argument(self.__pipelines[builder_name].process_item, result)
+                    pipeline_result = self.__check_argument(
+                        self.__check_parse(self.__pipelines[builder_name], result.parse), result)
                 else:
-                    raise TypeDifferent
+                    raise TypeDifferent([Request, Item])
 
-        # 7.完成一个响应，响应+1
+                # 7.管道处理完数据对象后，根据处理结果返回的对象类型，添加请求对象至调度器或结束当次响应任务
+                if isinstance(pipeline_result, Request):
+                    self.__add_request(pipeline_result, builder_name)
+                elif pipeline_result is None:
+                    pass
+                else:
+                    raise TypeDifferent([Request, None])
+
+        # 8.完成一个响应，响应+1
         # 无论是正常执行还是报错，都需要完成响应，否则引擎会一直卡死
         except FaultReturn:
             self.__statistics_lock('error')
@@ -356,6 +383,9 @@ class Engine(object):
         except ParameterError:
             self.__statistics_lock('error')
             logger.exception(self.__pe_warning.format(builder_name))
+        except ParseUnExist:
+            self.__statistics_lock('error')
+            logger.exception(self.__pue_warning.format(builder_name))
         except Exception:
             self.__statistics_lock('error')
             logger.exception(self.__b_warning.format(builder_name))

@@ -12,19 +12,10 @@ class Request(object):
         """
         初始配置
         :param collect_way:(type=str) 数据采集方式，限定“web”（获取网络数据）或“db”（获取数据库数据）
-        :param parse:(type=str) 指定解析函数的函数名，默认parse方法
-        :param meta:(type=∞) 用于请求对象与响应对象之间互传信息（数据），类型不限
+        :param parse:(type=str) 业务建造器中解析该请求对象的解析函数的函数名，默认parse函数
+        :param meta:(type=∞) 用于请求对象与响应对象之间互传信息（数据）
         """
 
         self.collect_way = collect_way
         self.parse = parse
         self.meta = meta
-
-    def __str__(self):
-        """
-        对象描述信息
-        :return info:(type=str) 对象描述信息
-        """
-
-        info = '我是内置请求对象'
-        return info

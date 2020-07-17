@@ -15,12 +15,3 @@ class Response(object):
         """
 
         self.meta = meta
-
-    def __str__(self):
-        """
-        对象描述信息
-        :return info:(type=str) 对象描述信息
-        """
-
-        info = '我是内置响应对象'
-        return info

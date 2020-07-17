@@ -101,10 +101,10 @@ class MySQL(object):
     def __filter_repetition(cls, host, port, user, db):
         """
         校验相同配置的连接是否已经创建
-        :param host:
-        :param port:
-        :param user:
-        :param db:
+        :param host:(type=str) 数据库ip地址
+        :param port:(type=int) 数据库端口
+        :param user:(type=str) 登录数据库的账号名
+        :param db:(type=str) 数据库名
         """
 
         # 转换host
@@ -151,6 +151,7 @@ class MySQL(object):
         cursor = connection.cursor(cursor=pymysql.cursors.DictCursor)  # 带上这个cursor参数可以使查询结果返回list与dict
 
         # 2.执行SQL
+        # 该对象固定auto_commit为True，连接池会自动提交事务
         try:
             result = cursor.execute(sql)
         except Exception as e:
@@ -162,7 +163,6 @@ class MySQL(object):
 
         # 4.把连接放回池
         # 池化技术并不会正真销毁连接
-        cursor.close()
         connection.close()
 
         # 5.返回执行结果

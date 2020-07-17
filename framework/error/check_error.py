@@ -13,7 +13,7 @@ class TypeDifferent(BaseError):
     def __init__(self, right_obj=None):
         """
         初始配置
-        :param right_obj:(type=内置对象) 正确的对象，默认无
+        :param right_obj:(type=list) 正确的对象的列表，默认无
         """
 
         self.__right_obj = right_obj
@@ -26,7 +26,8 @@ class TypeDifferent(BaseError):
 
         info = 'return或yield的对象类型错误！'
         if self.__right_obj is not None:
-            info += '正确对象的描述信息：%s' % str(self.__right_obj)
+            info += '正确对象的信息：%s' % '；'.join(
+                ['%s.%s' % (i + 1, str(self.__right_obj[i])) for i, obj in enumerate(self.__right_obj)])
         return info
 
 
@@ -47,7 +48,7 @@ class FaultReturn(BaseError):
 
 class ArgumentNumError(BaseError):
     """
-    继承重写的方法接收传参数量不正确
+    继承重写的方法接收传参（数量或参数名）不正确
     """
 
     def __str__(self):
@@ -56,7 +57,7 @@ class ArgumentNumError(BaseError):
         :return info:(type=str) 异常描述
         """
 
-        info = '接收传参数量不正确！'
+        info = '接收传参（数量或参数名）不正确！'
         return info
 
 
@@ -105,4 +106,19 @@ class CheckUnPass(BaseError):
         """
 
         info = self.__info if self.__info is not None else '校验不通过！'
+        return info
+
+
+class ParseUnExist(BaseError):
+    """
+    解析函数不存在对应的业务组件对象里的错误
+    """
+
+    def __str__(self):
+        """
+        异常描述信息
+        :return info:(type=str) 异常描述
+        """
+
+        info = '解析函数不存在对应的业务组件对象里！'
         return info

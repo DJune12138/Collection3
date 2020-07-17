@@ -48,23 +48,25 @@ class Builder(object):
         yield item
 
     @staticmethod
-    def request(info):
+    def request(*args, **kwargs):
         """
         为业务建造器提供生成内置请求对象的接口
-        :param info:(type=) 请求信息（数据类型还没定好，待补）
+        :param args:(type=tuple) 生成请求对象的信息，可变参数
+        :param kwargs:(type=dict) 生成请求对象的信息，关键词参数
         :return request:(type=Request) 内置请求对象
         """
 
-        request = Request(info)
+        request = Request(*args, **kwargs)
         return request
 
     @staticmethod
-    def item(data):
+    def item(*args, **kwargs):
         """
         为业务建造器提供生成内置数据对象的接口
-        :param data:(type=∞) 建造器解析处理好的数据，虽然类型不限，但一般建议使用便于解读数据结构的类型，比如dict、list
+        :param args:(type=tuple) 生成数据对象的信息，可变参数
+        :param kwargs:(type=dict) 生成数据对象的信息，关键词参数
         :return item:(type=Item) 内置数据对象
         """
 
-        item = Item(data)
+        item = Item(*args, **kwargs)
         return item

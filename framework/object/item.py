@@ -8,22 +8,15 @@ class Item(object):
     数据对象
     """
 
-    def __init__(self, data):
+    def __init__(self, data, parse='process_item'):
         """
         初始配置
-        :param data:(type=Request,Response) 构造器解析后的数据
+        :param data:(type=∞) 建造器分析处理好的数据
+        :param parse:(type=str) 业务管道中解析该数据对象的解析函数的函数名，默认process_item函数
         """
 
         self.__data = data
-
-    def __str__(self):
-        """
-        对象描述信息
-        :return info:(type=str) 对象描述信息
-        """
-
-        info = '我是内置数据对象'
-        return info
+        self.parse = parse
 
     @property
     def data(self):
