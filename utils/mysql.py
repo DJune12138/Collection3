@@ -7,7 +7,8 @@ MySQL数据库连接池
 
 import pymysql
 from DBUtils.PooledDB import PooledDB
-from hashlib import sha1
+from utils import common_function as cf
+from config import account_name
 
 
 class MySQLError(Exception):
@@ -55,6 +56,17 @@ class ExecuteError(MySQLError):
         """
 
         info = 'SQL执行失败！\n原生报错信息：%s\nSQL：%s' % (self.row_msg, self.sql)
+        return info
+
+
+class RepetitiveConnect(MySQLError):
+    def __str__(self):
+        """
+        异常描述信息
+        :return info:(type=str) 异常描述
+        """
+
+        info = '相同配置的MySQL连接已创建！请勿重复创建连接，造成资源浪费！（Tips：如不同业务用同配置的连接，可在%s模块的MySQL配置里添加）' % account_name
         return info
 
 
@@ -112,17 +124,12 @@ class MySQL(object):
             host = 'localhost'
 
         # 根据连接信息计算特征值
-        s1 = sha1()
-        s1.update(host.encode('utf-8'))  # sha1计算的对象必须是字节类型
-        s1.update(str(port).encode('utf-8'))
-        s1.update(user.encode('utf-8'))
-        s1.update(db.encode('utf-8'))
-        fp = s1.hexdigest()
+        fp = cf.calculate_fp([host, str(port), user, db])
 
         # 判断特征值是否已经存在
         # 存在则不给创建并抛异常，不存在则添加特征值用于后续判断
         if fp in cls.__filter_container:
-            raise MySQLError('相同配置的MySQL连接已创建！请勿重复创建连接，造成资源浪费！')
+            raise RepetitiveConnect
         else:
             cls.__filter_container.add(fp)
 
@@ -203,8 +210,8 @@ class MySQL(object):
         拼接常规INSERT语句并执行
         :param table:(type=str) 要插入数据的表名
         :param values:(type=list) 单条数据，["a", "b", "c", ...]；多条数据，[["a", "b", "c", ...], [1, 2, 3, ...], ...]
-        :param columns:(type=list) 需要插入数据的字段，默认所有字段
-        :param duplicates:(type=list) 主键冲突则更新，[column1, column2, column3, ...]
+        :param columns:(type=list) 需要插入数据的字段，默认所有字段，["column1", "column2", "column3", ...]
+        :param duplicates:(type=list) 主键冲突则更新，["column1", "column2", "column3", ...]
         :return result:(type=int) 执行结果，受影响行数
         """
 

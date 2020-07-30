@@ -65,10 +65,11 @@ class Engine(object):
             self.error_mutex = Lock()  # 错误数互斥锁
 
             # 警告语模板
-            total_warning = '，请规范写法，详情请查看框架内相关类的说明。'
+            total_warning = '，请规范写法，详情请查看报错提示信息、文档或相关类的说明。'
             self.__fr_warning = '业务建造器（{}）回调函数（{}）没有使用关键字yield%s' % total_warning
             self.__td_warning = '业务（{}）继承重写的方法没有返回正确的内置对象%s' % total_warning
             self.__ane_warning = '业务（{}）继承重写的方法没有接收正确数量的传参或参数名错误%s' % total_warning
+            self.__cu_warning = '业务（{}）参数校验不通过%s' % total_warning
             self.__pe_warning = '业务（{}）下载器获取到的请求对象参数不正确%s' % total_warning
             self.__pue_warning = '业务（{}）组件里没有parse参数对应的解析函数%s' % total_warning
             self.__b_warning = '业务级错误！业务名称为{}。'
@@ -83,6 +84,9 @@ class Engine(object):
         """
         把通过脚本传参开启的业务初始化为引擎能用的格式
         """
+
+        # 开始加载
+        cf.print_log('开始加载所有业务模块...')
 
         # 默认对象
         # 默认对象是完全一样功能的对象，无需每循环一个就开辟一块内存，在循环前先创建
@@ -100,6 +104,7 @@ class Engine(object):
 
             # 1.1 校验模块
             for code in set(code_list):
+                cf.print_log('加载%s模块下的%s...' % (module_name, code))
                 try:
                     m = import_module('%s.%s.%s.%s' % (business_name, module_name, code, code))
                 except ModuleNotFoundError:
@@ -133,7 +138,11 @@ class Engine(object):
                     continue
 
                 # 1.4 全部校验通过，添加业务建造器
-                self.__builders[obj_name] = obj()
+                try:
+                    self.__builders[obj_name] = obj()
+                except Exception:
+                    logger.exception('业务建造器（%s）初始化失败！' % obj_name)
+                    continue
 
                 # 2.添加业务管道
                 # 业务管道、中间件等都是附加组件，可以没有，没有则使用默认
@@ -172,6 +181,9 @@ class Engine(object):
                     else:
                         self.__downloader_mws[obj_name] = downloader_mw
                         logger.exception('业务下载器中间件（%s）没有继承内置下载器中间件，已更换成默认下载器中间件！请规范写法。')
+
+        # 加载完成
+        cf.print_log('所有业务模块加载完成！')
 
     def __call_back(self, temp):
         """
@@ -256,9 +268,13 @@ class Engine(object):
 
         lock = getattr(self, '%s_mutex' % type_)
         lock.acquire()
-        nums_name = 'total_%s_nums' % type_
-        setattr(self, nums_name, getattr(self, nums_name) + 1)
-        lock.release()
+        try:
+            nums_name = 'total_%s_nums' % type_
+            setattr(self, nums_name, getattr(self, nums_name) + 1)
+        except Exception as e:
+            raise e
+        finally:
+            lock.release()
 
     def __add_request(self, request, builder_name):
         """
@@ -302,16 +318,23 @@ class Engine(object):
                 # 当编写人比较皮，所有业务建造器中的start都是一个空列表时，会出现引擎卡死的现象
                 # 为了防止这种现象，如果start_list为空时，加个彩蛋请求，让引擎有机会关闭
                 if empty:
-                    self.__add_request(Request('test'), builder_name)
+                    self.__add_request(Request('test', parse='_funny'), builder_name)
 
             # 处理异常
             except FaultReturn:  # 校验yield不通过
+                self.__add_request(Request('test', parse='_funny'), builder_name)  # 彩蛋请求，作用同上
                 logger.exception(self.__fr_warning.format(builder_name, 'start_requests'))
             except TypeDifferent:  # 校验类型不通过
+                self.__add_request(Request('test', parse='_funny'), builder_name)
                 logger.exception(self.__td_warning.format(builder_name))
             except ArgumentNumError:  # 校验函数传参不通过
+                self.__add_request(Request('test', parse='_funny'), builder_name)
                 logger.exception(self.__ane_warning.format(builder_name))
+            except CheckUnPass:  # start校验不通过
+                self.__add_request(Request('test', parse='_funny'), builder_name)
+                logger.exception(self.__cu_warning.format(builder_name))
             except Exception:  # 其他业务级错误
+                self.__add_request(Request('test', parse='_funny'), builder_name)
                 logger.exception(self.__b_warning.format(builder_name))
 
     def __execute_request_response_item(self):
@@ -402,11 +425,24 @@ class Engine(object):
         self.__pool.apply_async(self.__start_request, error_callback=self.__error_callback)
 
         # 异步处理解析过程中产生的请求
-        # 默认有多少个业务，就开启多少并发
+        # 默认有多少个业务，就开启多少倍并发
         # 如果业务数大于控制的最大并发数，则使用配置的最大并发数
+        # 可通过传参灵活控制并发倍数
         if not isinstance(F_max_async, int) or F_max_async < 1:
             raise CheckUnPass('配置config中的最大并发数F_max_async不为int类型或小于1，请修改！')
-        for i in range(self.__builders_num if self.__builders_num <= F_max_async else F_max_async):
+        if not isinstance(F_every_async, int) or F_every_async < 1:
+            raise CheckUnPass('配置config中的并发倍数F_every_async不为int类型或小于1，请修改！')
+        argv_ea = getattr(argv, pk_ea.replace('-', '_'))
+        if argv_ea is not None:
+            try:
+                argv_ea = int(argv_ea)
+            except ValueError:
+                raise CheckUnPass('脚本传参%s（并发倍数）不为数字，请修改！' % pk_ea)
+            if argv_ea < 1:
+                raise CheckUnPass('脚本传参%s（并发倍数）小于1，请修改！' % pk_ea)
+        every_async = argv_ea if argv_ea is not None else F_every_async
+        async_count = self.__builders_num * every_async
+        for i in range(async_count if async_count <= F_max_async else F_max_async):
             self.__pool.apply_async(self.__execute_request_response_item, callback=self.__call_back,
                                     error_callback=self.__error_callback)
 
@@ -418,6 +454,9 @@ class Engine(object):
                     self.__is_running = False  # 标记可以关闭引擎
                     break
 
+        # TODO 加一个流程，start_requests结束再来个end_requests
+        pass
+
     def start(self):
         """
         启动引擎
@@ -425,6 +464,9 @@ class Engine(object):
 
         try:
             self.__start_engine()
+        except CheckUnPass as e:
+            logger.exception(e)
+            sys.exit()
         except Exception:
             logger.exception(self.__f_exception)
             sys.exit()

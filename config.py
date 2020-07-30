@@ -12,10 +12,10 @@ business_name = 'business'
 account_name = 'account'
 
 # 脚本参数相关
-pe_main = '该参数为主参数，有且仅有一个！'  # 主参数通用说明
+pe_main = '该参数为主参数，至少有一个！'  # 主参数通用说明
 pe_extra = '该参数为额外参数，可选，在某些业务可能是必选参数！'
 pk_main = 'main'  # main的key
-pk_gc = 'game-code'
+pk_gc = 'game-collection'
 pk_simple = 'simple'
 pk_help = 'help'
 pk_module = 'module'
@@ -23,19 +23,46 @@ pk_builder = 'builder'
 pk_pipeline = 'pipeline'
 pk_builder_mw = 'builder_mw'
 pk_downloader_mw = 'downloader_mw'
+pk_ws = 'web-spider'
+pk_extra = 'extra'
+pk_st = 'start-time'
+pk_et = 'end-time'
+pk_ea = 'every-async'
 p_parser = {  # 所有传参构成的字典
     pk_main: {  # 主参数
         pk_gc: {
             pk_simple: 'gc',  # 传参简写
-            pk_help: '游戏代码，使用该参数即进入游戏日志采集。%s' % pe_main,  # 参数说明
+            pk_help: '游戏采集，使用该参数即进入游戏日志数据采集。%s' % pe_main,  # 参数说明
             pk_module: 'game',  # 大类业务所属文件夹名
             pk_builder: 'GameBuilder',  # 大类业务建造器统一名称
             pk_pipeline: 'GamePipeline',  # 大类业务管道统一名称
             pk_builder_mw: 'GameBuilderMW',  # 大类业务建造器中间件统一名称
             pk_downloader_mw: 'GameDownloaderMW'  # 大类业务下载器中间件统一名称
+        },
+        pk_ws: {
+            pk_simple: 'ws',
+            pk_help: '网络爬虫，使用该参数即进入网络爬虫数据采集。%s' % pe_main,
+            pk_module: 'spider',
+            pk_builder: 'SpiderBuilder',
+            pk_pipeline: 'SpiderPipeline',
+            pk_builder_mw: 'SpiderBuilderMW',
+            pk_downloader_mw: 'SpiderDownloaderMW'
         }
     },
-    'extra': {}  # 额外参数
+    pk_extra: {  # 额外参数
+        pk_ea: {
+            pk_simple: 'a',
+            pk_help: '每个业务开启的并发（并发倍数），必须为大于1的整数。'
+        },
+        pk_st: {
+            pk_simple: 's',
+            pk_help: '开始时间，格式为“%Y%m%d”或“%Y%m%d%H%M”。'
+        },
+        pk_et: {
+            pk_simple: 'e',
+            pk_help: '结束时间，格式为“%Y%m%d”或“%Y%m%d%H%M”。'
+        }
+    }
 }
 
 # 日志器配置
@@ -52,4 +79,7 @@ logger_config = {
 # 最大并发数
 # 必须为大于等于1的整数
 # 请根据机器性能配置该数字，并不是越大越好
-F_max_async = 10
+F_max_async = 50
+
+# 每个业务开启的并发
+F_every_async = 5

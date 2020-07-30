@@ -5,6 +5,9 @@
 # 脚本传参
 argv = None
 
+# 项目启动时刻的datetime对象
+now_datetime = None
+
 # 日志器
 logger = None
 

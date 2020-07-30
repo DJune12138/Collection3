@@ -1,5 +1,6 @@
 import argparse
 import json
+import datetime
 from concurrent.futures import ThreadPoolExecutor
 import services
 from config import *
@@ -52,6 +53,15 @@ def __get_argv():
         services.argv = argv
 
 
+def __get_now_datetime():
+    """
+    记录项目启动时刻的datetime对象
+    """
+
+    if services.now_datetime is None:
+        services.now_datetime = datetime.datetime.now()
+
+
 def __get_logger():
     """
     根据配置，加载公共日志器
@@ -85,5 +95,6 @@ def load():
     """
 
     __get_argv()
+    __get_now_datetime()
     __get_logger()
     __get_mysql()

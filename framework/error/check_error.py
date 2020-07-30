@@ -122,3 +122,26 @@ class ParseUnExist(BaseError):
 
         info = '解析函数不存在对应的业务组件对象里！'
         return info
+
+
+class LackParameter(BaseError):
+    """
+    缺少参数
+    """
+
+    def __init__(self, parameter):
+        """
+        初始配置
+        :param parameter:(type=list) 缺少的参数名，元素为str类型
+        """
+
+        self.__parameter = parameter
+
+    def __str__(self):
+        """
+        异常描述信息
+        :return info:(type=str) 异常描述
+        """
+
+        info = '缺少必要的参数（%s）！' % '、'.join(self.__parameter)
+        return info
