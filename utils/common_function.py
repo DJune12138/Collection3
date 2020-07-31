@@ -7,7 +7,8 @@ import time
 import hashlib
 import requests
 import json
-from datetime import datetime, timedelta
+import datetime
+import base64
 
 
 def print_log(msg):
@@ -130,9 +131,9 @@ def datetime_timedelta(td_type, td_count, date_time=None, format_=None):
     """
 
     if date_time is None:
-        date_time = datetime.now()
+        date_time = datetime.datetime.now()
     kwargs = {td_type: td_count}
-    new_datetime = date_time + timedelta(**kwargs)
+    new_datetime = date_time + datetime.timedelta(**kwargs)
     if format_:
         new_datetime = new_datetime.strftime(format_)
     return new_datetime
@@ -153,3 +154,33 @@ def change_time_format(time_str, before='%Y%m%d', after='%Y-%m-%d', interval=0):
     else:
         new_str = time.strftime(after, time.localtime(time.mktime(time.strptime(time_str, before)) + interval))
     return new_str
+
+
+def base64_change(content, encode=True, charset='utf-8', re_str=True):
+    """
+    进行base64的编码解码
+    :param content:(type=str,bytes) 要编码或解码的内容
+    :param encode:(type=bool) 编码还是解码，True为编码，False为解码，默认编码
+    :param charset:(type=str) 字符集，默认utf-8
+    :param re_str:(type=bool) 是否返回字符串，默认True
+    :return new_content:(type=str,bytes) 编码或解码后的内容
+    """
+
+    # 兼容None
+    if content is None:
+        content = ''
+
+    # 编码
+    if encode:
+        if isinstance(content, str):
+            content = content.encode(charset)
+        new_content = base64.b64encode(content)
+
+    # 解码
+    else:
+        new_content = base64.b64decode(content)
+
+    # 根据re_str返回字符串或二进制
+    if re_str:
+        new_content = new_content.decode()
+    return new_content

@@ -1,8 +1,3 @@
-第三方库：
-（暂无）
-
-
-
 目录架构：
 -- Collection3
   -- account                       --> 存放各类服务的连接信息
@@ -32,24 +27,10 @@
     -- logger.py                   --> 日志器
     -- mysql.py                    --> MySQL数据库连接池
   -- config.py                     --> 项目配置
+  -- factory.py                    --> 工厂开关
   -- main.py                       --> 项目入口
 
 
 
-主参数详情：
--gc --game-code：使用该参数会引导至game目录下对应的游戏日志采集脚本。
-
-
-
-额外参数详情：
-（暂无）
-
-
-
-# TODO 该特别说明准备弃置，后续会移去wiki，目前都是旧说明
-特别说明：
-1、使用Python3，带上参数，运行manage.py文件。
-2、主参数有且仅有一个，起引导至对应脚本的作用。
-3、额外参数根据不同业务有不同作用，具体请查看业务代码，某些额外参数在某些业务可能是必选参数。
-4、新建脚本时，请遵守目录结构规则，例如要新建一个游戏日志采集脚本，目录结构应为“business/game/{game-code}/{game-code}.py”。
-5、每个脚本都应为一个类封装，每种类别的类名应遵守config的all_parser对应的object，并有run方法做入口。
+wiki文档地址：
+https://wiki.gamedreamer.com/display/dataDevelop/Collection3

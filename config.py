@@ -2,8 +2,25 @@
 1.项目配置参数
 2.该文件中的配置都不允许随意删除，每个配置都有地方会引用
 3.某部分配置有特定的数据结构，比如list、dict，或者更复杂的嵌套，请参照已配置好的格式进行修改
-4.框架配置相关参数是framework逻辑专用，同时也用于管理项目业务，比如控制开启业务、并发数等
+4.工厂配置在工厂模式使用，一般只提供给本config配置文件使用，各“工厂”一套配置
+5.通用配置在各个地方都可以使用，包括业务
+6.框架配置相一般是framework专用，同时也用于管理业务，比如控制开启业务、并发数等
 """
+
+from factory import factory_code
+
+"""工厂配置"""
+
+factory_config = {
+    1: {
+        'logger_config.log_path': None  # 日志保存路径
+    },
+    2: {
+        'logger_config.log_path': '/data/logs/c3_log'
+    }
+}
+
+"""通用配置"""
 
 # 业务模块名称
 business_name = 'business'
@@ -71,11 +88,12 @@ logger_config = {
     'level': None,
     'fmt': None,
     'date_fmt': None,
-    'log_path': None,
+    'log_path': factory_config[factory_code]['logger_config.log_path'],
     'log_name': None
 }
 
-# 框架业务配置相关
+"""框架配置"""
+
 # 最大并发数
 # 必须为大于等于1的整数
 # 请根据机器性能配置该数字，并不是越大越好
