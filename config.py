@@ -17,7 +17,7 @@ factory_config = {
         'logger_config.log_path': None  # 日志保存路径
     },
     2: {
-        'logger_config.log_path': '/data/logs/c3_log'
+        'logger_config.log_path': '/data/logs/c3_logs'
     }
 }
 
