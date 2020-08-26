@@ -5,8 +5,8 @@
 # 脚本传参
 argv = None
 
-# 启动时刻的datetime对象
-now_datetime = None
+# 启动时刻的参数
+launch = None
 
 # Redis数据库连接池
 redis = None

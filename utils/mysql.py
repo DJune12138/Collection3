@@ -8,6 +8,7 @@ MySQL数据库连接池
 
 import pymysql
 from DBUtils.PooledDB import PooledDB
+from threading import Lock
 from utils import common_function as cf
 from config import account_name
 
@@ -107,6 +108,9 @@ class MySQL(object):
     # 配置信息为host、port、user、db
     __filter_container = set()
 
+    # 互斥锁，防止同特征值的连接在异步任务的情况下通过去重验证
+    __lock = Lock()
+
     def __init__(self, max_connections=None, set_session=None, **kwargs):
         """
         初始配置
@@ -127,7 +131,8 @@ class MySQL(object):
             raise MySQLError('MySQL连接初始化失败！缺少必要的数据库连接信息：%s' % str(e).replace("'", ''))
 
         # 校验连接复用性
-        self.__filter_repetition(host, port, user, db)
+        with MySQL.__lock:
+            self.__filter_repetition(host, port, user, db)
 
         # 校验通过，创建连接池
         self.__pool = PooledDB(creator=pymysql, autocommit=True, maxconnections=max_connections, setsession=set_session,

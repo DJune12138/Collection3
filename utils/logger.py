@@ -46,6 +46,7 @@ datefmt格式说明：
 import os
 import time
 import logging
+from threading import Lock
 import services
 from config import dk_plan, ding_interval
 from utils import common_function as cf
@@ -66,8 +67,11 @@ class Logger(object):
         :param log_name:(type=str) 日志文件名称，默认以当天时间命名
         """
 
-        # Redis
+        # 利用Redis过期机制用于判断钉钉消息是否在指定时间内已发送过
         self.redis = services.redis['127_3']
+
+        # 互斥锁，防止同特征值的消息在异步任务的情况下重复发送
+        self.lock = Lock()
 
         # 获取一个logger对象
         self.__logger = logging.getLogger()
@@ -145,22 +149,21 @@ class Logger(object):
         # 执行日志器原生exception方法
         self.__logger.exception(msg, *args, **kwargs)
 
-        # 尝试发送钉钉消息
+        # 计算特征值
+        fp_key = cf.calculate_fp([key, str(type(e))])
+
+        # 根据特征值，获取Redis信息
         try:
+            with self.lock:  # 利用锁机制，确保不会重复发送
+                redis_result = self.redis.get(fp_key)
 
-            # 1.计算特征值
-            fp_key = cf.calculate_fp([key, str(type(e))])
+                # Redis信息已过期（不存在），发送钉钉
+                if redis_result is None:
+                    ding_result = cf.send_ding(msg, group)
 
-            # 2.根据特征值，获取Redis信息
-            redis_result = self.redis.get(fp_key)
-
-            # 3.1 Redis信息已过期（不存在），发送钉钉
-            if redis_result is None:
-                ding_result = cf.send_ding(msg, group)
-
-                # 3.2 重设Redis消息
-                if ding_result:
-                    self.redis.set(fp_key, time.strftime('%Y-%m-%d %H:%M:%S'), ex=ding_interval)
+                    # 重设Redis消息
+                    if ding_result:
+                        self.redis.set(fp_key, time.strftime('%Y-%m-%d %H:%M:%S'), ex=ding_interval)
 
         # 失败则不再发送，记录日志
         except Exception as e:

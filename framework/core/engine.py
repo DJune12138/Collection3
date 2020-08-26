@@ -265,19 +265,14 @@ class Engine(object):
 
     def __statistics_lock(self, type_):
         """
-        避免线性安全问题，利用互斥锁统计数据
+        避免线程安全问题，利用互斥锁统计数据
         :param type_:(type=str) 数据的名称
         """
 
         lock = getattr(self, '%s_mutex' % type_)
-        lock.acquire()
-        try:
+        with lock:
             nums_name = 'total_%s_nums' % type_
             setattr(self, nums_name, getattr(self, nums_name) + 1)
-        except Exception as e:
-            raise e
-        finally:
-            lock.release()
 
     def __add_request(self, request, builder_name):
         """

@@ -1,6 +1,8 @@
 import argparse
 import json
 import datetime
+import os
+import socket
 import services
 from config import *
 from utils.logger import Logger
@@ -37,13 +39,22 @@ def __get_argv():
         services.argv = argv
 
 
-def __get_now_datetime():
+def __get_launch():
     """
-    记录项目启动时刻的datetime对象
+    记录项目启动时刻的参数
     """
 
-    if services.now_datetime is None:
-        services.now_datetime = datetime.datetime.now()
+    if services.launch is None:
+        services.launch = dict()
+        services.launch['datetime'] = datetime.datetime.now()  # datetime对象
+        services.launch['pid'] = os.getpid()  # 进程id
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            s.connect(('8.8.8.8', 80))
+            ip = s.getsockname()[0]
+        finally:
+            s.close()
+        services.launch['ip'] = ip  # ip地址
 
 
 def __get_redis():
@@ -97,7 +108,7 @@ def load():
     """
 
     __get_argv()
-    __get_now_datetime()
+    __get_launch()
     __get_redis()
     __get_logger()
     __get_mysql()

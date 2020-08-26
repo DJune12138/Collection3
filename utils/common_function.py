@@ -10,23 +10,8 @@ import requests
 import json
 import datetime
 import base64
-import socket
+import services
 from config import ding_token, factory_config, factory_code
-
-
-def __get_local_ip():
-    """
-    获取本机外网IP地址
-    :return:(type=str) 本机外网IP地址
-    """
-
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        s.connect(('8.8.8.8', 80))
-        ip = s.getsockname()[0]
-    finally:
-        s.close()
-    return ip
 
 
 def print_log(msg):
@@ -35,7 +20,8 @@ def print_log(msg):
     :param msg:(type=str) 日志信息
     """
 
-    print('%s(%s)：%s' % (time.strftime('%Y-%m-%d %H:%M:%S'), __pid, msg))
+    print('%s(%s)：%s' % (time.strftime('%Y-%m-%d %H:%M:%S'),
+                         services.launch['pid'] if services.launch is not None else '', msg))
     sys.stdout.flush()
 
 
@@ -220,7 +206,8 @@ def send_ding(msg, group):
     # 钉钉消息内容
     log_path = factory_config[factory_code]['logger_config.log_path']
     log_path = log_path if log_path is not None else os.path.join(os.getcwd(), 'log')
-    ding_msg = '任务出错了！详情请查看报错日志！\n执行任务的主机IP：%s\n报错日志路径：%s\n报错信息：%s' % (__ip, log_path, msg)
+    ding_msg = '任务出错了！详情请查看报错日志！\n执行任务的主机IP：%s\n报错日志路径：%s\n报错信息：%s' \
+               % (services.launch['ip'], log_path, msg)
 
     # 发送钉钉消息
     url = 'https://oapi.dingtalk.com/robot/send?access_token=%s' % ding_token[group]
@@ -243,12 +230,3 @@ def send_ding(msg, group):
 
     # 返回发送结果
     return result
-
-
-# 以下为其他函数用到的公共参数
-__ip = None  # 本机ip
-if __ip is None:
-    __ip = __get_local_ip()
-__pid = None  # 当前进程id
-if __pid is None:
-    __pid = os.getpid()

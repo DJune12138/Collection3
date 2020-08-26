@@ -5,6 +5,7 @@ Redis数据库连接池
 """
 
 import redis
+from threading import Lock
 from utils import common_function as cf
 from config import account_name
 
@@ -70,6 +71,9 @@ class Redis(object):
     # 配置信息为host、port、db
     __filter_container = set()
 
+    # 互斥锁，防止同特征值的连接在异步任务的情况下通过去重验证
+    __lock = Lock()
+
     def __init__(self, max_connections=None, **kwargs):
         """
         初始配置
@@ -83,7 +87,8 @@ class Redis(object):
         db = kwargs.get('db', 0)
 
         # 校验连接复用性
-        self.__filter_repetition(host, port, db)
+        with Redis.__lock:
+            self.__filter_repetition(host, port, db)
 
         # 校验通过，创建连接池
         self.__pool = redis.ConnectionPool(host=host, port=port, db=db, decode_responses=True,
