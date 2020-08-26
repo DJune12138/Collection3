@@ -3,6 +3,7 @@ MySQL数据库连接池
 1.连接池适用于并发，PooledDB接口可用于多线程公用连接池
 2.创建连接池后，每次执行语句只需要直接从池中获取空闲连接即可，用完关闭
 3.每次获取和关闭连接并不是正真创建和销毁数据库连接，而是经过池化技术管理，省去创建和销毁连接的开销，提高效率
+4.创建连接池时并没有真正连接数据库，如果业务里没有使用到对应数据库的话并不会浪费数据库连接的资源
 """
 
 import pymysql
@@ -60,6 +61,10 @@ class ExecuteError(MySQLError):
 
 
 class RepetitiveConnect(MySQLError):
+    """
+    重复连接
+    """
+
     def __str__(self):
         """
         异常描述信息
@@ -67,6 +72,29 @@ class RepetitiveConnect(MySQLError):
         """
 
         info = '相同配置的MySQL连接已创建！请勿重复创建连接，造成资源浪费！（Tips：如不同业务用同配置的连接，可在%s模块的MySQL配置里添加）' % account_name
+        return info
+
+
+class ConnectFailed(MySQLError):
+    """
+    连接失败
+    """
+
+    def __init__(self, info):
+        """
+        初始配置
+        :param info:(type=str) 原生报错提示信息
+        """
+
+        self.info = info
+
+    def __str__(self):
+        """
+        异常描述信息
+        :return info:(type=str) 异常描述
+        """
+
+        info = 'MySQL连接失败，请确认配置连接信息和数据库权限是否正确！%s' % self.info
         return info
 
 
@@ -84,7 +112,7 @@ class MySQL(object):
         初始配置
         :param max_connections:(type=int) 连接池允许的最大连接数，0和None表示不限制连接数，默认不限制
         :param set_session:(type=list) 开始会话前执行的命令列表，如：["set datestyle to ...", "set time zone ..."]，默认为空
-        :param kwargs:(type=dict) 其余的命名参数，用于接收数据库连接信息，如ip、port等
+        :param kwargs:(type=dict) 其余的命名参数，用于接收数据库连接信息，如host、port等
         """
 
         # 获取配置信息
@@ -94,20 +122,16 @@ class MySQL(object):
             user = kwargs['user']
             db = kwargs['db']
             password = kwargs['password']
-            charset = kwargs.get('charset', 'utf-8')
+            charset = kwargs.get('charset', 'utf8')
         except KeyError as e:
             raise MySQLError('MySQL连接初始化失败！缺少必要的数据库连接信息：%s' % str(e).replace("'", ''))
 
         # 校验连接复用性
         self.__filter_repetition(host, port, user, db)
 
-        # 校验通过，创建连接
-        try:
-            self.__pool = PooledDB(creator=pymysql, autocommit=True, mincached=1, maxconnections=max_connections,
-                                   setsession=set_session, host=host, port=port, user=user, passwd=password, db=db,
-                                   charset=charset)
-        except pymysql.err.OperationalError as e:
-            raise MySQLError('MySQL连接初始化失败，请确认配置连接信息和数据库权限是否正确！%s' % e)
+        # 校验通过，创建连接池
+        self.__pool = PooledDB(creator=pymysql, autocommit=True, maxconnections=max_connections, setsession=set_session,
+                               host=host, port=port, user=user, passwd=password, db=db, charset=charset)
 
     @classmethod
     def __filter_repetition(cls, host, port, user, db):
@@ -154,7 +178,10 @@ class MySQL(object):
 
         # 1.从池中获取连接
         # 由于使用池化技术，每次执行语句都从池中获取一条空闲连接即可
-        connection = self.__pool.connection()
+        try:
+            connection = self.__pool.connection()
+        except pymysql.err.OperationalError as e:
+            raise ConnectFailed(str(e))
         cursor = connection.cursor(cursor=pymysql.cursors.DictCursor)  # 带上这个cursor参数可以使查询结果返回list与dict
 
         # 2.执行SQL

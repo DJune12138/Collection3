@@ -1,7 +1,10 @@
 目录架构：
 -- Collection3
   -- account                       --> 存放各类服务的连接信息
-  -- business                      --> 业务代码
+  -- business                      --> 业务模块
+    -- demo                        --> 演示和调试模块
+    -- game                        --> 游戏采集模块
+    -- spider                      --> 网络爬虫模块
   -- framework                     --> 框架代码
     -- core                        --> 核心组件
       -- builder.py                --> 建造器组件
@@ -26,6 +29,7 @@
     -- common_function.py          --> 非业务公共函数
     -- logger.py                   --> 日志器
     -- mysql.py                    --> MySQL数据库连接池
+    -- redis.py                    --> Redis数据库连接池
   -- config.py                     --> 项目配置
   -- factory.py                    --> 工厂开关
   -- main.py                       --> 项目入口

@@ -56,7 +56,7 @@ class Pipeline(object):
     def into_db(data):
         """
         入库的通用接口
-        :param item:(type=dict) 解析后，准备入库的数据；db_type指定数据库类型，db_name指定关键字映射的数据库对象，其余参数参考工具包
+        :param data:(type=dict) 解析后，准备入库的数据；db_type指定数据库类型，db_name指定关键字映射的数据库对象，其余参数参考工具包
         """
 
         db_type = data.setdefault('db_type', 'mysql')

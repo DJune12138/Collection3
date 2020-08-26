@@ -36,6 +36,9 @@ class Engine(object):
         初始配置
         """
 
+        # 框架级错误使用的key
+        self.framework_key = 'framework'
+
         # 组件、中间件初始化
         try:
             self.__builders = dict()  # 建造器
@@ -76,8 +79,8 @@ class Engine(object):
             self.__f_exception = '框架级错误！引擎原地爆炸！'
 
         # 初始化失败
-        except Exception:
-            logger.exception('框架级错误！引擎初始化失败！')
+        except Exception as e:
+            logger.ding_exception('框架级错误！引擎初始化失败！', e, self.framework_key)
             sys.exit()
 
     def __init_all(self):
@@ -140,8 +143,8 @@ class Engine(object):
                 # 1.4 全部校验通过，添加业务建造器
                 try:
                     self.__builders[obj_name] = obj()
-                except Exception:
-                    logger.exception('业务建造器（%s）初始化失败！' % obj_name)
+                except Exception as e:
+                    logger.ding_exception('业务建造器（%s）初始化失败！' % obj_name, e, obj_name)
                     continue
 
                 # 2.添加业务管道
@@ -203,8 +206,8 @@ class Engine(object):
 
         try:
             raise exception  # 抛出异常后，才能被日志进行完整记录下来
-        except Exception:
-            logger.exception(self.__f_exception)
+        except Exception as e:
+            logger.ding_exception(self.__f_exception, e, self.framework_key)
 
     @staticmethod
     def __check_return(obj, right_obj=None):
@@ -333,9 +336,9 @@ class Engine(object):
             except CheckUnPass:  # start校验不通过
                 self.__add_request(Request('test', parse='_funny'), builder_name)
                 logger.exception(self.__cu_warning.format(builder_name))
-            except Exception:  # 其他业务级错误
+            except Exception as e:  # 其他业务级错误
                 self.__add_request(Request('test', parse='_funny'), builder_name)
-                logger.exception(self.__b_warning.format(builder_name))
+                logger.ding_exception(self.__b_warning.format(builder_name), e, builder_name)
 
     def __execute_request_response_item(self):
         """
@@ -351,10 +354,10 @@ class Engine(object):
                 return
             builder_name = request.builder_name  # 业务名称
             parse_name = request.parse  # 解析函数
-        except Exception:
+        except Exception as e:
             self.__statistics_lock('error')
             self.__statistics_lock('response')
-            logger.exception(self.__f_exception)
+            logger.ding_exception(self.__f_exception, e, self.framework_key)
             return
 
         # 4.调用下载器，获取响应对象
@@ -381,16 +384,15 @@ class Engine(object):
                 elif isinstance(result, Item):
                     pipeline_result = self.__check_argument(
                         self.__check_parse(self.__pipelines[builder_name], result.parse), result)
+                    if pipeline_result is not None:  # 如果不是返回None，还需要校验是否yield生成器
+                        self.__check_return(pipeline_result)
                 else:
                     raise TypeDifferent([Request, Item])
 
                 # 7.管道处理完数据对象后，根据处理结果返回的对象类型，添加请求对象至调度器或结束当次响应任务
-                if isinstance(pipeline_result, Request):
-                    self.__add_request(pipeline_result, builder_name)
-                elif pipeline_result is None:
-                    pass
-                else:
-                    raise TypeDifferent([Request, None])
+                if pipeline_result is not None:
+                    for one_request in pipeline_result:
+                        self.__add_request(one_request, builder_name)
 
         # 8.完成一个响应，响应+1
         # 无论是正常执行还是报错，都需要完成响应，否则引擎会一直卡死
@@ -409,9 +411,9 @@ class Engine(object):
         except ParseUnExist:
             self.__statistics_lock('error')
             logger.exception(self.__pue_warning.format(builder_name))
-        except Exception:
+        except Exception as e:
             self.__statistics_lock('error')
-            logger.exception(self.__b_warning.format(builder_name))
+            logger.ding_exception(self.__b_warning.format(builder_name), e, builder_name)
         finally:
             self.__statistics_lock('response')
 
@@ -467,8 +469,8 @@ class Engine(object):
         except CheckUnPass as e:
             logger.exception(e)
             sys.exit()
-        except Exception:
-            logger.exception(self.__f_exception)
+        except Exception as e:
+            logger.ding_exception(self.__f_exception, e, self.framework_key)
             sys.exit()
         cf.print_log('总共完成业务%s个！添加请求%s个，完成响应%s个，其中错误响应%s个！' % (
             self.__builders_num, self.total_request_nums, self.total_response_nums, self.total_error_nums))

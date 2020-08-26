@@ -46,6 +46,9 @@ datefmt格式说明：
 import os
 import time
 import logging
+import services
+from config import dk_plan, ding_interval
+from utils import common_function as cf
 
 
 class Logger(object):
@@ -62,6 +65,9 @@ class Logger(object):
         :param log_path:(type=str) 存放日志的路径，默认当前路径下的log文件夹
         :param log_name:(type=str) 日志文件名称，默认以当天时间命名
         """
+
+        # Redis
+        self.redis = services.redis['127_3']
 
         # 获取一个logger对象
         self.__logger = logging.getLogger()
@@ -102,7 +108,7 @@ class Logger(object):
         log_path = os.path.join(self.__log_path, filename)
 
         # 获取一个文件日志handler
-        file_handler = logging.FileHandler(filename=log_path, encoding='utf-8')
+        file_handler = logging.FileHandler(filename=log_path, encoding='utf8')
 
         # 设置日志格式
         file_handler.setFormatter(self.__file_formatter)
@@ -125,6 +131,41 @@ class Logger(object):
         # 返回
         return console_handler
 
+    def __ding_exception(self, msg, e, key='', group=dk_plan, *args, **kwargs):
+        """
+        记录日志，并发送钉钉消息
+        :param msg:(type=str) 报错消息
+        :param msg:(type=Exception) 错误对象
+        :param key:(type=str) 报错的额外标识，比如业务名称，默认空字符串
+        :param group:(type=str) 要发送消息的群组，默认发去计划任务群组
+        :param args:(type=tuple) 其余的执行日志器原生exception方法的参数
+        :param kwargs:(type=dict) 其余的执行日志器原生exception方法的参数
+        """
+
+        # 执行日志器原生exception方法
+        self.__logger.exception(msg, *args, **kwargs)
+
+        # 尝试发送钉钉消息
+        try:
+
+            # 1.计算特征值
+            fp_key = cf.calculate_fp([key, str(type(e))])
+
+            # 2.根据特征值，获取Redis信息
+            redis_result = self.redis.get(fp_key)
+
+            # 3.1 Redis信息已过期（不存在），发送钉钉
+            if redis_result is None:
+                ding_result = cf.send_ding(msg, group)
+
+                # 3.2 重设Redis消息
+                if ding_result:
+                    self.redis.set(fp_key, time.strftime('%Y-%m-%d %H:%M:%S'), ex=ding_interval)
+
+        # 失败则不再发送，记录日志
+        except Exception as e:
+            self.__logger.exception('钉钉消息发送失败！%s' % e)
+
     @property
     def logger(self):
         """
@@ -133,4 +174,5 @@ class Logger(object):
         """
 
         log = self.__logger
+        log.ding_exception = self.__ding_exception
         return log

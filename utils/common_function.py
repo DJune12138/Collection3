@@ -2,6 +2,7 @@
 非业务公共函数
 """
 
+import os
 import sys
 import time
 import hashlib
@@ -9,6 +10,23 @@ import requests
 import json
 import datetime
 import base64
+import socket
+from config import ding_token, factory_config, factory_code
+
+
+def __get_local_ip():
+    """
+    获取本机外网IP地址
+    :return:(type=str) 本机外网IP地址
+    """
+
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(('8.8.8.8', 80))
+        ip = s.getsockname()[0]
+    finally:
+        s.close()
+    return ip
 
 
 def print_log(msg):
@@ -17,7 +35,7 @@ def print_log(msg):
     :param msg:(type=str) 日志信息
     """
 
-    print('%s：%s' % (time.strftime('%Y-%m-%d %H:%M:%S'), msg))
+    print('%s(%s)：%s' % (time.strftime('%Y-%m-%d %H:%M:%S'), __pid, msg))
     sys.stdout.flush()
 
 
@@ -31,7 +49,7 @@ def calculate_fp(parameters):
     s1 = hashlib.sha1()
     for parameter in parameters:
         if isinstance(parameter, str):
-            s1.update(parameter.encode('utf-8'))  # sha1计算的对象必须是字节类型
+            s1.update(parameter.encode('utf8'))  # sha1计算的对象必须是字节类型
         elif isinstance(parameter, bytes):
             s1.update(parameter)
         else:
@@ -156,12 +174,12 @@ def change_time_format(time_str, before='%Y%m%d', after='%Y-%m-%d', interval=0):
     return new_str
 
 
-def base64_change(content, encode=True, charset='utf-8', re_str=True):
+def base64_change(content, encode=True, charset='utf8', re_str=True):
     """
     进行base64的编码解码
     :param content:(type=str,bytes) 要编码或解码的内容
     :param encode:(type=bool) 编码还是解码，True为编码，False为解码，默认编码
-    :param charset:(type=str) 字符集，默认utf-8
+    :param charset:(type=str) 字符集，默认utf8
     :param re_str:(type=bool) 是否返回字符串，默认True
     :return new_content:(type=str,bytes) 编码或解码后的内容
     """
@@ -184,3 +202,53 @@ def base64_change(content, encode=True, charset='utf-8', re_str=True):
     if re_str:
         new_content = new_content.decode()
     return new_content
+
+
+def send_ding(msg, group):
+    """
+    发送钉钉消息
+    :param msg:(type=str) 要发送的钉钉信息内容
+    :param group:(type=str) 要发送的钉钉群组
+    :return result:(type=bool) 发送结果，成功为True，失败为False
+    """
+
+    # 校验group
+    group_list = ding_token.keys()
+    if group not in group_list:
+        raise ValueError('group只能为%s其中一个！' % '、'.join(group_list))
+
+    # 钉钉消息内容
+    log_path = factory_config[factory_code]['logger_config.log_path']
+    log_path = log_path if log_path is not None else os.path.join(os.getcwd(), 'log')
+    ding_msg = '任务出错了！详情请查看报错日志！\n执行任务的主机IP：%s\n报错日志路径：%s\n报错信息：%s' % (__ip, log_path, msg)
+
+    # 发送钉钉消息
+    url = 'https://oapi.dingtalk.com/robot/send?access_token=%s' % ding_token[group]
+    data = {
+        'msgtype': 'text',
+        'text': {
+            'content': ding_msg
+        }
+    }
+    headers = {
+        'Content-Type': 'application/json;charset=utf-8'
+    }
+    response = repetition_json(url, method='post', headers=headers, data=json.dumps(data))
+    if response['errcode'] == 0:
+        print_log('钉钉消息发送成功！')
+        result = True
+    else:
+        print_log('钉钉消息发送失败！')
+        result = False
+
+    # 返回发送结果
+    return result
+
+
+# 以下为其他函数用到的公共参数
+__ip = None  # 本机ip
+if __ip is None:
+    __ip = __get_local_ip()
+__pid = None  # 当前进程id
+if __pid is None:
+    __pid = os.getpid()

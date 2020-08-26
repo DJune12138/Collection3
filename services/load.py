@@ -1,27 +1,11 @@
 import argparse
 import json
 import datetime
-from concurrent.futures import ThreadPoolExecutor
 import services
 from config import *
 from utils.logger import Logger
-from utils.mysql import MySQL
-
-
-def __connect_mysql(name, info):
-    """
-    用于多任务创建连接池
-    :param name:(type=str) 连接池的key
-    :param info:(type=dict) 连接的信息
-    """
-
-    host = info.get('host', 'localhost')
-    port = info.get('port', 3306)
-    try:
-        services.mysql[name] = MySQL(host=host, port=port, user=info['user'], password=info['password'], db=info['db'],
-                                     charset=info.get('charset', 'utf8'))
-    except Exception:
-        services.logger.exception('MySQL数据库（host为%s，port为%s）连接失败！' % (host, port))
+from utils.mysql import MySQL, RepetitiveConnect as mysql_repetitive
+from utils.redis import Redis, RepetitiveConnect as redis_repetitive
 
 
 def __get_argv():
@@ -62,6 +46,22 @@ def __get_now_datetime():
         services.now_datetime = datetime.datetime.now()
 
 
+def __get_redis():
+    """
+    加载Redis数据库连接池
+    """
+
+    if services.redis is None:
+        services.redis = dict()
+        with open('%s/redis.json' % account_name, 'r') as f:
+            redis_account = json.load(f)
+        for name, info in redis_account.items():
+            try:
+                services.redis[name] = Redis(**info)
+            except redis_repetitive:
+                services.logger.exception('Redis数据库（%s）重复连接！' % name)
+
+
 def __get_logger():
     """
     根据配置，加载公共日志器
@@ -84,9 +84,11 @@ def __get_mysql():
         services.mysql = dict()
         with open('%s/mysql.json' % account_name, 'r') as f:
             mysql_account = json.load(f)
-        with ThreadPoolExecutor() as executor:  # 用异步任务去连接数据库，每个任务相互独立，互不影响
-            for name, info in mysql_account.items():
-                executor.submit(__connect_mysql, name, info)
+        for name, info in mysql_account.items():
+            try:
+                services.mysql[name] = MySQL(**info)
+            except mysql_repetitive:
+                services.logger.exception('MySQL数据库（%s）重复连接！' % name)
 
 
 def load():
@@ -96,5 +98,6 @@ def load():
 
     __get_argv()
     __get_now_datetime()
+    __get_redis()
     __get_logger()
     __get_mysql()

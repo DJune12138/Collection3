@@ -33,6 +33,7 @@ account_name = 'account'
 pe_main = '该参数为主参数，至少有一个！'  # 主参数通用说明
 pe_extra = '该参数为额外参数，可选，在某些业务可能是必选参数！'
 pk_main = 'main'  # main的key
+pk_dt = 'demo-test'
 pk_gc = 'game-collection'
 pk_simple = 'simple'
 pk_help = 'help'
@@ -48,14 +49,23 @@ pk_et = 'end-time'
 pk_ea = 'every-async'
 p_parser = {  # 所有传参构成的字典
     pk_main: {  # 主参数
+        pk_dt: {
+            pk_simple: 'dt',  # 传参简写
+            pk_help: '演示和调试，使用该参数即进入架构调试。%s' % pe_main,  # 参数说明
+            pk_module: 'demo',  # 大类业务所属文件夹名
+            pk_builder: 'DemoBuilder',  # 大类业务建造器统一名称
+            pk_pipeline: 'DemoPipeline',  # 大类业务管道统一名称
+            pk_builder_mw: 'DemoBuilderMW',  # 大类业务建造器中间件统一名称
+            pk_downloader_mw: 'DemoDownloaderMW'  # 大类业务下载器中间件统一名称
+        },
         pk_gc: {
-            pk_simple: 'gc',  # 传参简写
-            pk_help: '游戏采集，使用该参数即进入游戏日志数据采集。%s' % pe_main,  # 参数说明
-            pk_module: 'game',  # 大类业务所属文件夹名
-            pk_builder: 'GameBuilder',  # 大类业务建造器统一名称
-            pk_pipeline: 'GamePipeline',  # 大类业务管道统一名称
-            pk_builder_mw: 'GameBuilderMW',  # 大类业务建造器中间件统一名称
-            pk_downloader_mw: 'GameDownloaderMW'  # 大类业务下载器中间件统一名称
+            pk_simple: 'gc',
+            pk_help: '游戏采集，使用该参数即进入游戏日志数据采集。%s' % pe_main,
+            pk_module: 'game',
+            pk_builder: 'GameBuilder',
+            pk_pipeline: 'GamePipeline',
+            pk_builder_mw: 'GameBuilderMW',
+            pk_downloader_mw: 'GameDownloaderMW'
         },
         pk_ws: {
             pk_simple: 'ws',
@@ -92,6 +102,17 @@ logger_config = {
     'log_path': factory_config[factory_code]['logger_config.log_path'],
     'log_name': None
 }
+
+# 钉钉机器人token
+dk_plan = 'plan'  # plan的key
+dk_live = 'live'
+ding_token = {
+    dk_plan: '551f99239793cc8490769a4325abbed0243114f26cfc06e67664ad30abbac839',  # 计划任务
+    dk_live: 'fa66808a722dd7b2a147d47cc13a6d8e9db71b9d01ff2e613f2005c3cd30d881'  # 直播后台
+}
+
+# 同类型（特征值相同）钉钉消息发送间隔（单位：秒）
+ding_interval = 14100  # 4小时减5分钟
 
 """框架配置"""
 
