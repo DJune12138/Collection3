@@ -300,7 +300,8 @@ class Engine(object):
 
     def __start_request(self, request_type):
         """
-        处理初始请求
+        处理每次引擎循环启动的起始请求
+        :param request_type:(type=str) 引擎循环启动的类型
         """
 
         # 1.调用建造器，获取请求对象列表
@@ -368,10 +369,16 @@ class Engine(object):
 
         # 4.调用下载器，获取响应对象
         try:
+            builder = self.__builders[builder_name]  # 业务建造器对象
             downloader_mw = self.__downloader_mws[builder_name]
             request = self.__check_return(self.__check_argument(
                 downloader_mw.process_request, request), right_obj=Request)  # 下载器请求处理
-            response = self.__downloader.get_response(request)
+            try:
+                response = self.__downloader.get_response(request)
+            except Exception as e:  # 下载过程中出错，把原生错误对象与请求对象交回给建造器处理
+                builder.downloader_error_callback(e, request)
+                self.__statistics_lock('response')
+                return
             response = self.__check_return(self.__check_argument(
                 downloader_mw.process_response, response), right_obj=Response)  # 下载器响应处理
             response.meta = request.meta  # 信息（数据）互传
@@ -380,7 +387,7 @@ class Engine(object):
             response = self.__check_return(self.__check_argument(
                 self.__builder_mws[builder_name].process_response, response), right_obj=Response)  # 建造器响应处理
             response_list = self.__check_return(
-                self.__check_argument(self.__check_parse(self.__builders[builder_name], parse_name), response))
+                self.__check_argument(self.__check_parse(builder, parse_name), response))
 
             # 6.根据响应对象类型，把该对象添加至调度器或交给管道
             for result in response_list:

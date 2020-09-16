@@ -62,6 +62,15 @@ class Builder(object):
         item = self.item(None)
         yield item
 
+    def downloader_error_callback(self, e, request):
+        """
+        当下载器抛出异常后，会调用此函数，一般都需要业务建造器继承重写处理异常的逻辑
+        :param e:(type=Exception) 下载器抛出的异常对象
+        :param request:(type=Request) 交给下载器的请求对象
+        """
+
+        raise e
+
     @staticmethod
     def request(*args, **kwargs):
         """
