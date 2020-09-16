@@ -2,7 +2,6 @@
 非业务公共函数
 """
 
-import os
 import sys
 import time
 import hashlib
@@ -10,8 +9,8 @@ import requests
 import json
 import datetime
 import base64
-import services
-from config import ding_token, factory_config, factory_code
+import subprocess
+import services  # 该模块在加载服务前就已经被导入，只能导入总模块，否则所有服务都会是加载前的None
 
 
 def print_log(msg):
@@ -20,27 +19,42 @@ def print_log(msg):
     :param msg:(type=str) 日志信息
     """
 
-    print('%s(%s)：%s' % (time.strftime('%Y-%m-%d %H:%M:%S'),
-                         services.launch['pid'] if services.launch is not None else '', msg))
+    pid = '(%s)' % services.launch['pid'] if services.launch is not None else ''
+    print('%s%s：%s' % (time.strftime('%Y-%m-%d %H:%M:%S'), pid, msg))
     sys.stdout.flush()
 
 
-def calculate_fp(parameters):
+def calculate_fp(parameters, algorithms='sha1'):
     """
     计算特征值
-    :param parameters:(type=list) 参数列表，元素均为str或bytes类型
-    :return:
+    :param parameters:(type=list,str,bytes) 参数列表，为list类型时则依次添加特征数据算特征值，元素均为str或bytes类型
+    :param algorithms:(type=str) 算法，默认sha1
+    :return fp:(type=str) 特征值计算结果
     """
 
-    s1 = hashlib.sha1()
+    # 校验算法是否为官方支持算法，并生成算法对象
+    available_list = hashlib.algorithms_available  # 官方支持算法
+    if algorithms not in available_list:
+        raise ValueError('algorithms（算法）只能为%s中的一种！' % '、'.join(available_list))
+    hash_object = getattr(hashlib, algorithms)()
+
+    # 校验parameters参数类型是否正确
+    if isinstance(parameters, str) or isinstance(parameters, bytes):
+        parameters = [parameters]
+    elif isinstance(parameters, list):
+        pass
+    else:
+        raise TypeError('parameters应为list、str或bytes类型！')
+
+    # 校验特征数据类型并计算特征值，返回特征值
     for parameter in parameters:
         if isinstance(parameter, str):
-            s1.update(parameter.encode('utf8'))  # sha1计算的对象必须是字节类型
+            hash_object.update(parameter.encode('utf8'))  # 计算的对象必须是字节类型
         elif isinstance(parameter, bytes):
-            s1.update(parameter)
+            hash_object.update(parameter)
         else:
-            TypeError('parameters元素均为str或bytes类型！')
-    fp = s1.hexdigest()
+            TypeError('parameters为list类型时，元素应为str或bytes类型！')
+    fp = hash_object.hexdigest()
     return fp
 
 
@@ -53,7 +67,7 @@ def request_get_response(url, method='get', interval=0, retry_interval=1, timeou
     :param retry_interval:(type=int) 重连请求间隔时间（秒），默认1
     :param timeout:(type=int) 超时时间（秒），默认30
     :param retry:(type=int) 重连次数，默认3
-    :param kwargs:(type=dict) 其余的命名参数，用于接收请求头与请求体
+    :param kwargs:(type=dict) 其余的关键字参数，用于接收请求头与请求体
     :return response:(type=Response) 响应数据，如果多次尝试请求仍然失败，抛异常。
     """
 
@@ -107,7 +121,7 @@ def repetition_json(url, interval_=1, retry_=3, **kwargs):
     :param url:(type=str) 请求地址
     :param interval_:(type=int) 重试间隔时间（秒），默认1
     :param retry_:(type=int) 重试次数，默认3
-    :param kwargs:(type=dict) 其余的命名参数，用于接收请求方式、请求头、请求体等，传参给获取请求数据的函数使用
+    :param kwargs:(type=dict) 其余的关键字参数，用于接收请求方式、请求头、请求体等，传参给获取请求数据的函数使用
     :return json_data:(type=dict,list) 解析后的json数据
     """
 
@@ -190,43 +204,28 @@ def base64_change(content, encode=True, charset='utf8', re_str=True):
     return new_content
 
 
-def send_ding(msg, group):
+def shell_run(shell, cwd=None, timeout=None, check=True, pr_std=True, **kwargs):
     """
-    发送钉钉消息
-    :param msg:(type=str) 要发送的钉钉信息内容
-    :param group:(type=str) 要发送的钉钉群组
-    :return result:(type=bool) 发送结果，成功为True，失败为False
+    执行shell命令，关于subprocess参考：https://www.jianshu.com/p/592202895978
+    :param shell:(type=str) 要执行的shell命令
+    :param cwd:(type=str) 执行命令前要切换的工作目录，默认不切换
+    :param timeout:(type=int) 超时（单位：秒），超出时间结束执行并抛异常（对象属性参考上述网址），默认不设置
+    :param check:(type=bool) 如执行完毕后状态码为非0（有报错），则抛异常，默认True
+    :param pr_std:(type=bool) 执行完成后是否把标准错误与标准输出打印至控制台，默认True
+    :param kwargs:(type=dict) 防止传入额外关键字参数报错
+    :return result:(type=CompletedProcess) 执行结果的对象（对象属性参考上述网址）
     """
 
-    # 校验group
-    group_list = ding_token.keys()
-    if group not in group_list:
-        raise ValueError('group只能为%s其中一个！' % '、'.join(group_list))
-
-    # 钉钉消息内容
-    log_path = factory_config[factory_code]['logger_config.log_path']
-    log_path = log_path if log_path is not None else os.path.join(os.getcwd(), 'log')
-    ding_msg = '任务出错了！详情请查看报错日志！\n执行任务的主机IP：%s\n报错日志路径：%s\n报错信息：%s' \
-               % (services.launch['ip'], log_path, msg)
-
-    # 发送钉钉消息
-    url = 'https://oapi.dingtalk.com/robot/send?access_token=%s' % ding_token[group]
-    data = {
-        'msgtype': 'text',
-        'text': {
-            'content': ding_msg
-        }
-    }
-    headers = {
-        'Content-Type': 'application/json;charset=utf-8'
-    }
-    response = repetition_json(url, method='post', headers=headers, data=json.dumps(data))
-    if response['errcode'] == 0:
-        print_log('钉钉消息发送成功！')
-        result = True
-    else:
-        print_log('钉钉消息发送失败！')
-        result = False
-
-    # 返回发送结果
+    result = subprocess.run(shell, shell=True, capture_output=True, cwd=cwd, timeout=timeout, check=check)
+    if pr_std:
+        try:
+            stdout = result.stdout.decode()
+        except UnicodeDecodeError:
+            stdout = result.stdout.decode('gbk')
+        print('stdout：%s' % stdout)
+        try:
+            stderr = result.stderr.decode()
+        except UnicodeDecodeError:
+            stderr = result.stderr.decode('gbk')
+        print('stderr：%s' % stderr)
     return result

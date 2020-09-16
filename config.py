@@ -4,8 +4,8 @@
 3.某部分配置有特定的数据结构，比如list、dict，或者更复杂的嵌套，请参照已配置好的格式进行修改
 4.特别提醒，关于配置传参的隐含问题，如果需要--help打印出%，则需要%%
 5.工厂配置在工厂模式使用，一般只提供给本config配置文件使用，各“工厂”一套配置
-6.通用配置在各个地方都可以使用，包括业务
-7.框架配置相一般是framework专用，同时也用于管理业务，比如控制开启业务、并发数等
+6.框架配置相一般是framework专用，同时也用于管理业务，比如控制开启业务、并发数等
+7.通用配置在各个地方都可以使用，包括业务
 """
 
 from factory import factory_code
@@ -14,12 +14,24 @@ from factory import factory_code
 
 factory_config = {
     1: {
-        'logger_config.log_path': None  # 日志保存路径
+        'logger_config.log_path': None,  # 日志保存路径
+        'geoip2_path': r'D:\software\Python38\Lib\site-packages\_geoip_geolite2\GeoLite2-City.mmdb'  # geoip2驱动路径
     },
     2: {
-        'logger_config.log_path': '/data/logs/c3_logs'
+        'logger_config.log_path': '/data/logs/c3_logs',
+        'geoip2_path': '/data/lib/geoipdb/GeoLite2-City.mmdb'
     }
 }
+
+"""框架配置"""
+
+# 最大并发数
+# 必须为大于等于1的整数
+# 请根据机器性能配置该数字，并不是越大越好
+F_max_async = 50
+
+# 每个业务开启的并发
+F_every_async = 5
 
 """通用配置"""
 
@@ -114,12 +126,11 @@ ding_token = {
 # 同类型（特征值相同）钉钉消息发送间隔（单位：秒）
 ding_interval = 14100  # 4小时减5分钟
 
-"""框架配置"""
+# 游戏采集时间节点间隔（单位：分）
+gc_interval = 10
 
-# 最大并发数
-# 必须为大于等于1的整数
-# 请根据机器性能配置该数字，并不是越大越好
-F_max_async = 50
+# 反查结果缓存的Redis
+pegging_redis = '127_8'
 
-# 每个业务开启的并发
-F_every_async = 5
+# geoip2驱动路径
+geoip2_path = factory_config[factory_code]['geoip2_path']

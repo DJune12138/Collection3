@@ -27,6 +27,7 @@
     -- load.py                     --> 加载公共服务
   -- utils                         --> 工具包
     -- common_function.py          --> 非业务公共函数
+    -- common_profession.py        --> 业务公共函数
     -- logger.py                   --> 日志器
     -- mysql.py                    --> MySQL数据库连接池
     -- redis.py                    --> Redis数据库连接池

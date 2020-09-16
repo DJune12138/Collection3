@@ -61,8 +61,9 @@ class Engine(object):
             self.total_error_nums = 0
 
             # 异步任务相关
+            self.__while_run = True  # 引擎是否继续循环启动的标志
+            self.__is_running = False  # 引擎是否运作的标志
             self.__pool = Pool()  # 进程池
-            self.__is_running = False  # 判断引擎是否可以关闭的标志
             self.request_mutex = Lock()  # 请求数互斥锁
             self.response_mutex = Lock()  # 响应数互斥锁
             self.error_mutex = Lock()  # 错误数互斥锁
@@ -297,15 +298,21 @@ class Engine(object):
         # 请求+1
         self.__statistics_lock('request')
 
-    def __start_request(self):
+    def __start_request(self, request_type):
         """
         处理初始请求
         """
 
-        # 1.调用建造器，获取初始请求对象列表
+        # 1.调用建造器，获取请求对象列表
+        no_task = True  # 该点是否没有任务的标记
         for builder_name, builder in self.__builders.items():
             try:
-                start_list = self.__check_return(self.__check_argument(builder.start_requests))  # 校验是否yield
+                try:
+                    start_list = self.__check_return(self.__check_argument(getattr(builder, request_type)))  # 校验是否yield
+                except AttributeError:
+                    continue
+                else:
+                    no_task = False
                 empty = True  # 标记是否空start_list
 
                 # 2.添加请求对象到调度器中
@@ -334,6 +341,10 @@ class Engine(object):
             except Exception as e:  # 其他业务级错误
                 self.__add_request(Request('test', parse='_funny'), builder_name)
                 logger.ding_exception(self.__b_warning.format(builder_name), e, builder_name)
+
+        # 3.检索所有业务建造器后，如该点没有任务，则标记不再循环启动引擎
+        if no_task:
+            self.__while_run = False
 
     def __execute_request_response_item(self):
         """
@@ -412,16 +423,16 @@ class Engine(object):
         finally:
             self.__statistics_lock('response')
 
-    def __start_engine(self):
+    def __start_engine(self, request_type):
         """
         调用组件，框架运作
         """
 
-        # 使用异步任务添加初始请求
-        self.__is_running = True  # 启动引擎，设置状态为True
-        self.__pool.apply_async(self.__start_request, error_callback=self.__error_callback)
+        # 循环启动初始化
+        cf.print_log('执行%s任务！' % request_type)
+        if self.total_response_nums > self.total_request_nums:
+            self.total_response_nums = self.total_request_nums
 
-        # 异步处理解析过程中产生的请求
         # 默认有多少个业务，就开启多少倍并发
         # 如果业务数大于控制的最大并发数，则使用配置的最大并发数
         # 可通过传参灵活控制并发倍数
@@ -439,6 +450,12 @@ class Engine(object):
                 raise CheckUnPass('脚本传参%s（并发倍数）小于1，请修改！' % pk_ea)
         every_async = argv_ea if argv_ea is not None else F_every_async
         async_count = self.__builders_num * every_async
+
+        # 使用异步任务添加初始请求
+        self.__is_running = True  # 启动引擎，设置状态为True
+        self.__pool.apply_async(self.__start_request, args=(request_type,), error_callback=self.__error_callback)
+
+        # 异步处理解析过程中产生的请求
         for i in range(async_count if async_count <= F_max_async else F_max_async):
             self.__pool.apply_async(self.__execute_request_response_item, callback=self.__call_back,
                                     error_callback=self.__error_callback)
@@ -448,19 +465,28 @@ class Engine(object):
             time.sleep(0.001)  # 防止CPU空转
             if self.total_response_nums != 0:  # 由于异步任务，因此要响应不为0才开始判断
                 if self.total_response_nums >= self.total_request_nums:
-                    self.__is_running = False  # 标记可以关闭引擎
+                    self.__is_running = False  # 标记引擎关闭
                     break
-
-        # TODO 加一个流程，start_requests结束再来个end_requests
-        pass
 
     def start(self):
         """
         启动引擎
+        1.引擎可以多次循环启动，有先后顺序
+        2.先启动start_requests任务（必有），然后end_requests_1任务、end_requests_2任务、end_requests_3任务...以此类推
+        3.end_request系列的任务不一定会有，这取决于所有加载成功的业务建造器
+        4.当按顺序检索到所有业务建造器到某一点没有end_request任务，引擎不再循环启动，真正结束
         """
 
+        end_num = 1
         try:
-            self.__start_engine()
+            self.__start_engine('start_requests')  # 先执行start_request任务
+            while True:
+                request_type = 'end_requests_%s' % end_num
+                self.__start_engine(request_type)
+                if not self.__while_run or end_num >= 10:  # 防止未知BUG导致死循环，限制10次内结束
+                    cf.print_log('%s没有请求任务，引擎循环启动结束！' % request_type)
+                    break
+                end_num += 1
         except CheckUnPass as e:
             logger.exception(e)
             sys.exit()

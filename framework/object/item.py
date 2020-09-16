@@ -8,15 +8,17 @@ class Item(object):
     数据对象
     """
 
-    def __init__(self, data, parse='process_item'):
+    def __init__(self, data, parse='process_item', detail=None):
         """
         初始配置
         :param data:(type=∞) 建造器分析处理好的数据
         :param parse:(type=str) 业务管道中解析该数据对象的解析函数的函数名，默认process_item函数
+        :param detail:(type=str) 入库明细表的类型，如不启用入库明细表则为None，默认None
         """
 
         self.__data = data
         self.parse = parse
+        self.detail = detail
 
     @property
     def data(self):

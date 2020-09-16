@@ -49,7 +49,7 @@ import logging
 from threading import Lock
 import services
 from config import dk_plan, ding_interval
-from utils import common_function as cf
+from utils import common_function as cf, common_profession as cp
 
 
 class Logger(object):
@@ -159,7 +159,7 @@ class Logger(object):
 
                 # Redis信息已过期（不存在），发送钉钉
                 if redis_result is None:
-                    ding_result = cf.send_ding(msg, group)
+                    ding_result = cp.send_ding(msg, e, group)
 
                     # 重设Redis消息
                     if ding_result:

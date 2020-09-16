@@ -41,15 +41,17 @@ class ExecuteError(MySQLError):
     执行SQL语句时报错
     """
 
-    def __init__(self, sql, row_msg):
+    def __init__(self, sql, args, e):
         """
         初始配置
         :param sql:(type=str) 执行的SQL语句
-        :param row_msg:(type=str) 原生报错信息
+        :param args:(type=None,tuple,list,dict) args参数
+        :param e:(type=Exception) 原生报错对象
         """
 
         self.sql = sql
-        self.row_msg = str(row_msg)
+        self.sql_args = args
+        self.e = e
 
     def __str__(self):
         """
@@ -57,7 +59,7 @@ class ExecuteError(MySQLError):
         :return info:(type=str) 异常描述
         """
 
-        info = 'SQL执行失败！\n原生报错信息：%s\nSQL：%s' % (self.row_msg, self.sql)
+        info = 'SQL执行失败！\n原生报错信息：{}\nSQL：{}\nargs：{}'.format(str(self.e), self.sql, str(self.sql_args))
         return info
 
 
@@ -116,7 +118,7 @@ class MySQL(object):
         初始配置
         :param max_connections:(type=int) 连接池允许的最大连接数，0和None表示不限制连接数，默认不限制
         :param set_session:(type=list) 开始会话前执行的命令列表，如：["set datestyle to ...", "set time zone ..."]，默认为空
-        :param kwargs:(type=dict) 其余的命名参数，用于接收数据库连接信息，如host、port等
+        :param kwargs:(type=dict) 其余的关键字参数，用于接收数据库连接信息，如host、port等
         """
 
         # 获取配置信息
@@ -173,11 +175,13 @@ class MySQL(object):
         value = str(value).replace('"', '""').replace('\\', r'\\')
         return value
 
-    def execute(self, sql, fetchall=True):
+    def execute(self, sql, args=None, fetchall=True, **kwargs):
         """
         执行SQL语句，常规增删改查可使用对应方法，自编写语句可直接使用此方法
         :param sql:(type=str) 要执行的SQL语句，一般用于执行常规增删改查之外的语句
+        :param args:(type=tuple,list,dict) pymysql自带args，类似自动拼接SQL字符串并处理一些特殊符号的功能，默认None则不使用
         :param fetchall:(type=bool) 仅SELECT语句有效，是否返回查到的所有数据，True返回所有，False返回第一条，默认返回所有
+        :param kwargs:(type=dict) 额外的关键字参数，主要用于防止传入过多参数报错
         :return result:(type=list,dict,int) 执行结果，如果是SELECT语句则根据fetchall返回多条或单条数据，其他语句则返回受影响行数
         """
 
@@ -192,9 +196,9 @@ class MySQL(object):
         # 2.执行SQL
         # 该对象固定auto_commit为True，连接池会自动提交事务
         try:
-            result = cursor.execute(sql)
+            result = cursor.execute(sql, args=args)
         except Exception as e:
-            raise ExecuteError(sql, str(e))
+            raise ExecuteError(sql, args, e)
 
         # 3.判断是否为SELECT语句，如果是则获取查询结果
         if sql.lstrip()[:6].lower() == 'select':
@@ -207,13 +211,14 @@ class MySQL(object):
         # 5.返回执行结果
         return result
 
-    def select(self, table, columns=None, after_table='', fetchall=True):
+    def select(self, table, columns=None, after_table='', fetchall=True, **kwargs):
         """
         拼接常规SELECT语句并执行，返回查询结果
         :param table:(type=str) 要查询数据的表名
         :param columns:(type=list) 要查询的字段，默认查所有字段
         :param after_table:(type=str) 表名后的语句，where、group by等，自由发挥，请自行遵守语法，默认为空
         :param fetchall:(type=bool) 是否返回查到的所有数据，True为是并返回一个列表，False则只返回第一条数据，默认返回所有
+        :param kwargs:(type=dict) 额外的关键字参数，主要用于防止传入过多参数报错
         :return result:(type=list,dict) 查询结果，根据fetchall返回多条数据或单条数据
         """
 
@@ -229,7 +234,7 @@ class MySQL(object):
         sql = """SELECT %s
         FROM %s
         %s;""" \
-              % ('*' if columns is None else ','.join(columns),
+              % (columns,
                  table,
                  after_table)
 
@@ -237,13 +242,15 @@ class MySQL(object):
         result = self.execute(sql, fetchall=fetchall)
         return result
 
-    def insert(self, table, values, columns=None, duplicates=None):
+    def insert(self, table, values, columns=None, duplicates=None, ignore=False, **kwargs):
         """
         拼接常规INSERT语句并执行
         :param table:(type=str) 要插入数据的表名
         :param values:(type=list) 单条数据，["a", "b", "c", ...]；多条数据，[["a", "b", "c", ...], [1, 2, 3, ...], ...]
         :param columns:(type=list) 需要插入数据的字段，默认所有字段，["column1", "column2", "column3", ...]
-        :param duplicates:(type=list) 主键冲突则更新，["column1", "column2", "column3", ...]
+        :param duplicates:(type=list) 唯一键冲突则更新，["column1", "column2", "column3", ...]
+        :param ignore:(type=bool) 唯一键冲突则忽略，默认False；如果duplicates不为None，则ignore强制为False
+        :param kwargs:(type=dict) 额外的关键字参数，主要用于防止传入过多参数报错
         :return result:(type=int) 执行结果，受影响行数
         """
 
@@ -264,22 +271,25 @@ class MySQL(object):
         else:  # 插入单条数据
             values = '(%s)' % ','.join(['"%s"' % self.__replace_value(value) for value in values])
 
-        # 拼接“主键冲突则更新”
+        # 拼接“唯一键冲突则更新”
         if duplicates is not None:
             if not isinstance(duplicates, list):
                 raise MySQLError('duplicates参数类型应该为list！')
-            duplicates = 'ON DUPLICATE KEY UPDATE %s' % ','.join(
-                ['%s=VALUES(%s)' % (duplicate, duplicate) for duplicate in duplicates])
+            duplicates = 'ON DUPLICATE KEY UPDATE %s' % ','.join(['%s=VALUES(%s)' % (
+                duplicate, duplicate) for duplicate in duplicates])
+            ignore = False  # ignore强制为False
         else:
             duplicates = ''
 
+        # 拼接“唯一键冲突则忽略”
+        ignore = ' IGNORE ' if ignore else ' '
+
         # 构造SQL
-        sql = """INSERT INTO %s
+        sql = """INSERT%sINTO %s
         %s
-        VALUES
-        %s
+        VALUES %s
         %s;""" \
-              % (table,
+              % (ignore, table,
                  columns,
                  values,
                  duplicates)

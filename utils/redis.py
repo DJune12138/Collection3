@@ -78,7 +78,7 @@ class Redis(object):
         """
         初始配置
         :param max_connections:(type=int) 连接池允许的最大连接数，None表示采用内置限制连接数，默认采用内置限制
-        :param kwargs:(type=dict) 其余的命名参数，用于接收数据库连接信息，如host、port等
+        :param kwargs:(type=dict) 其余的关键字参数，用于接收数据库连接信息，如host、port等
         """
 
         # 获取配置信息

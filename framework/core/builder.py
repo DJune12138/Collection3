@@ -67,7 +67,7 @@ class Builder(object):
         """
         为业务建造器提供生成内置请求对象的接口
         :param args:(type=tuple) 生成请求对象的信息，可变参数
-        :param kwargs:(type=dict) 生成请求对象的信息，关键词参数
+        :param kwargs:(type=dict) 生成请求对象的信息，关键字参数
         :return request:(type=Request) 内置请求对象
         """
 
@@ -79,7 +79,7 @@ class Builder(object):
         """
         为业务建造器提供生成内置数据对象的接口
         :param args:(type=tuple) 生成数据对象的信息，可变参数
-        :param kwargs:(type=dict) 生成数据对象的信息，关键词参数
+        :param kwargs:(type=dict) 生成数据对象的信息，关键字参数
         :return item:(type=Item) 内置数据对象
         """
 
