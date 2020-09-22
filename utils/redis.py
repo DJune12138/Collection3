@@ -117,12 +117,13 @@ class Redis(object):
         else:
             cls.__filter_container.add(fp)
 
-    def set(self, key, value, ex=None):
+    def set(self, key, value, ex=None, **kwargs):
         """
-        设置一对string类型数据的键值
+        根据键，设置string类型的值
         :param key:(type=str) 键
         :param value:(type=str) 值
         :param ex:(type=int) 过期时间（单位：秒），默认不过期
+        :param kwargs:(type=dict) 防止传入过多关键字参数而报错
         :return result:(type=bool) 设置成功为True，否则为False
         """
 
@@ -133,16 +134,48 @@ class Redis(object):
                 raise ConnectFailed(str(e))
         return result
 
-    def get(self, key):
+    def get(self, key, **kwargs):
         """
-        根据键获取string类型数据的值
+        根据键，获取string类型的值
         :param key:(type=str) 键
+        :param kwargs:(type=dict) 防止传入过多关键字参数而报错
         :return result:(type=str,None) 值，没有结果则返回None
         """
 
         with redis.StrictRedis(connection_pool=self.__pool) as connection:
             try:
                 result = connection.get(key)
+            except redis.exceptions.ConnectionError as e:
+                raise ConnectFailed(str(e))
+        return result
+
+    def rpush(self, key, values, **kwargs):
+        """
+        根据键，在list类型的结尾插入值
+        :param key:(type=str) 键
+        :param values:(type=tuple,list) 要插入的值
+        :param kwargs:(type=dict) 防止传入过多关键字参数而报错
+        :return result:(type=int) 插入成功后该list的长度
+        """
+
+        with redis.StrictRedis(connection_pool=self.__pool) as connection:
+            try:
+                result = connection.rpush(key, *values)
+            except redis.exceptions.ConnectionError as e:
+                raise ConnectFailed(str(e))
+        return result
+
+    def lpop(self, key, **kwargs):
+        """
+        根据键，移出并获取list类型的开头的第一个值
+        :param key:(type=str) 键
+        :param kwargs:(type=dict) 防止传入过多关键字参数而报错
+        :return result:(type=str,None) 值，没有结果则返回None
+        """
+
+        with redis.StrictRedis(connection_pool=self.__pool) as connection:
+            try:
+                result = connection.lpop(key)
             except redis.exceptions.ConnectionError as e:
                 raise ConnectFailed(str(e))
         return result

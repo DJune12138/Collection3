@@ -53,14 +53,14 @@ def send_ding(msg, e, group):
     return result
 
 
-def game_money_dict(platform, game_code, start, end, game_point=False):
+def game_money_dict(platform, game_code, start, end, e_point=False):
     """
     构造获取平台储值的字典，用于构造请求
     :param platform:(type=str) 哪个平台，晶绮jq、和悦hy、初心cx
     :param game_code:(type=str) 游戏代码
     :param start:(type=str) 查询时间段的开始时间
     :param end:(type=str) 查询时间段的结束时间
-    :param game_point:(type=bool) 使用“gamepoint>0”的条件，默认不使用
+    :param e_point:(type=bool) 使用“epoint>0”的条件，默认不使用
     :return request_dict:(type=dict) 用于构造内置请求对象所用参数的字典
     """
 
@@ -71,15 +71,16 @@ def game_money_dict(platform, game_code, start, end, game_point=False):
     db_name = '%s_realtime' % platform
 
     # 表名
-    table = 'game_money'
+    table = 'stored_value_record'
 
     # 查询字段
-    columns = ['orderid', 'servercode', 'gamepoint', 'userid', 'create_time', 'comefrom']
+    columns = ['gd_orderid', 'servercode', 'epoint', 'userid', 'create_time',
+               'comefrom', 'user_ip']
 
     # 查询条件
-    game_point = ' AND gamepoint>0' if game_point else ''
-    after_table = 'WHERE gamecode="%s" AND (create_time BETWEEN "%s" AND "%s") AND status IN (1,10,20)%s' % (
-        game_code, start, end, game_point)
+    e_point = ' AND epoint>0' if e_point else ''
+    after_table = 'WHERE gamecode="%s" AND (create_time BETWEEN "%s" AND "%s") AND status IN (1,4)%s' % (
+        game_code, start, end, e_point)
 
     # 储值标识
     meta = 'pay'
@@ -90,14 +91,14 @@ def game_money_dict(platform, game_code, start, end, game_point=False):
     return request_dict
 
 
-def u_pegging(platform, game_code, userid_list, type_list, pass_redis=True):
+def u_pegging(platform, game_code, userid_list, type_list, pass_redis=False):
     """
     根据userid反查数据，比如IP地址、系统
     :param platform:(type=str) 哪个平台，晶绮jq、和悦hy、初心cx
     :param game_code:(type=str) 游戏代码
     :param userid_list:(type=list,set) 要反查的userid列表
     :param type_list:(type=list) 反查类型的列表，os为系统，ip为IP地址
-    :param pass_redis:(type=bool) 是否跳过查Redis，直接查MySQL，默认True
+    :param pass_redis:(type=bool) 是否跳过查Redis，直接查MySQL，默认False
     :return p_data:(type=dict) 反查的结果
     """
 
@@ -176,8 +177,7 @@ def ip_belong(ip, redis='127_0'):
             return result
 
     # 获取结果
-    code = 'unknow'
-    name = 'unknow'
+    code, name = '', ''
     if ip and len(ip) >= 7 and ip != '0.0.0.0':
         reader = geoip2_db.Reader(geoip2_path)
         try:

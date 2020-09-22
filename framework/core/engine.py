@@ -151,13 +151,18 @@ class Engine(object):
                 # 2.添加业务管道
                 # 业务管道、中间件等都是附加组件，可以没有，没有则使用默认
                 # 如果这些附加组件没有分别继承对应内置父类，也使用默认
+                # 如果初始化失败，则使用默认
                 try:
                     obj = getattr(m, p_parser[pk_main][type_][pk_pipeline])
                 except AttributeError:
                     self.__pipelines[obj_name] = pipeline
                 else:
                     if issubclass(obj, Pipeline):
-                        self.__pipelines[obj_name] = obj()
+                        try:
+                            self.__pipelines[obj_name] = obj()
+                        except Exception as e:
+                            self.__pipelines[obj_name] = pipeline
+                            logger.ding_exception('业务管道（%s）初始化失败，已更换成默认管道！' % obj_name, e, obj_name)
                     else:
                         self.__pipelines[obj_name] = pipeline
                         logger.exception('业务管道（%s）没有继承内置管道，已更换成默认管道！请规范写法。' % obj_name)
@@ -169,7 +174,11 @@ class Engine(object):
                     self.__builder_mws[obj_name] = builder_mw
                 else:
                     if issubclass(obj, BuilderMiddleware):
-                        self.__builder_mws[obj_name] = obj()
+                        try:
+                            self.__builder_mws[obj_name] = obj()
+                        except Exception as e:
+                            self.__builder_mws[obj_name] = builder_mw
+                            logger.ding_exception('业务建造器中间件（%s）初始化失败，已更换成默认建造器中间件！' % obj_name, e, obj_name)
                     else:
                         self.__builder_mws[obj_name] = builder_mw
                         logger.exception('业务建造器中间件（%s）没有继承内置建造器中间件，已更换成默认建造器中间件！请规范写法。')
@@ -181,7 +190,11 @@ class Engine(object):
                     self.__downloader_mws[obj_name] = downloader_mw
                 else:
                     if issubclass(obj, DownloaderMiddleware):
-                        self.__downloader_mws[obj_name] = obj()
+                        try:
+                            self.__downloader_mws[obj_name] = obj()
+                        except Exception as e:
+                            self.__downloader_mws[obj_name] = downloader_mw
+                            logger.ding_exception('业务下载器中间件（%s）初始化失败，已更换成默认下载器中间件！' % obj_name, e, obj_name)
                     else:
                         self.__downloader_mws[obj_name] = downloader_mw
                         logger.exception('业务下载器中间件（%s）没有继承内置下载器中间件，已更换成默认下载器中间件！请规范写法。')

@@ -6,4 +6,4 @@
 
 # 1为本地开发环境
 # 2为服务器生产环境
-factory_code = 2
+factory_code = 1

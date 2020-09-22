@@ -6,7 +6,7 @@
 from framework.object.response import Response
 from framework.error.check_error import ParameterError, LackParameter
 from utils import common_function as cf
-from services import mysql
+from services import mysql, redis
 
 
 class Downloader(object):
@@ -40,6 +40,7 @@ class Downloader(object):
         获取数据库数据
         1.下载信息里，db_type为数据库类型，默认使用MySQL
         2.db_name对应account模块里对应数据库连接信息的json字符串的key
+        3.当db_type为redis时，redis_get为获取数据的方式，默认get
         3.其余可选参数请查看工具包对应函数
         :param kwargs:(type=dict) 下载信息
         :return result:(type=list,dict) 查询结果
@@ -48,14 +49,17 @@ class Downloader(object):
         # 根据db_type，获取对应数据库数据
         db_type = kwargs.get('db_type', 'mysql')
         db_name = kwargs.get('db_name')
-        if db_type == 'mysql':
+        if db_type == 'mysql':  # MySQL
             mysql_db = mysql[db_name]
             if kwargs.get('sql') is None:  # 根据有没有SQL语句，决定用什么函数
                 result = mysql_db.select(**kwargs)
             else:
                 result = mysql_db.execute(**kwargs)
+        elif db_type == 'redis':  # Redis
+            redis_db = redis[db_name]
+            result = getattr(redis_db, kwargs.get('redis_get', 'get'))(**kwargs)
         else:
-            raise ParameterError('db_type', ['mysql'])
+            raise ParameterError('db_type', ['mysql', 'redis'])
 
         # 返回数据
         return result
@@ -87,14 +91,11 @@ class Downloader(object):
             data = self.__db(kwargs)
         elif way == 'shell':
             data = self.__shell(kwargs)
-        elif way == 'file':
-            data = None
         elif way == 'test':
             print('这是一个彩蛋๑乛◡乛๑，业务名称为%s。' % request.builder_name)
             data = None
         else:
-            raise ParameterError('way', ['“web”（获取网络数据）', '“db”（获取数据库数据）', '“file”（获取本地文件数据）',
-                                         '“shell”（执行shell命令并获取返回数据）'])
+            raise ParameterError('way', ['“web”（获取网络数据）', '“db”（获取数据库数据）', '“shell”（执行shell命令并获取返回数据）'])
 
         # 2.构建响应对象，并返回
         response = Response(data)

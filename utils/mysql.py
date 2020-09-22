@@ -297,11 +297,3 @@ class MySQL(object):
         # 执行并返回受影响行数
         result = self.execute(sql)
         return result
-
-    # TODO 改
-    def update(self):
-        pass
-
-    # TODO 删
-    def delete(self):
-        pass

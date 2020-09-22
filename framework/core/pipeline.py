@@ -5,7 +5,7 @@
 
 from framework.object.request import Request
 from framework.error.check_error import ParameterError
-from services import mysql
+from services import mysql, redis
 from utils import common_profession as cp
 
 
@@ -42,48 +42,49 @@ class Pipeline(object):
         if detail is not None:
             source = data['source']
             data['db_name'] = 'osa_' + data['platform']
-            if detail == 'online':  # 在线数
+            game_code = source['gamecode']
+            server_code = source['servercode']
+            time = source['time']
+            duplicates = source.get('duplicates')
+            if duplicates:
+                data['duplicates'] = duplicates
+            else:
+                data['ignore'] = True
+            if detail == 'online':  # 在线
                 data['table'] = 'oper_game_online'
-                data['values'] = [source['gamecode'], source['servercode'], source['online_time'],
-                                  source['online_count']]
                 data['columns'] = ['gamecode', 'servercode', 'online_time', 'online_count']
-                data['duplicates'] = ['online_count']
+                data['values'] = [game_code, server_code, time, source['count']]
             elif detail in ('register', 'login', 'pay'):  # 注册、登录、储值
-                time = source['time']
                 userid = source['userid']
                 puid = source.get('puid') if source.get('puid') else userid
                 ip = source.get('ip', '')
-                os = source.get('os', 'unknow')
-                if os.lower() == 'android':
-                    os = 'Android'
-                elif os.lower() == 'ios':
-                    os = 'IOS'
                 area_code = cp.ip_belong(ip)['code']
-                data['ignore'] = True
-                if detail == 'register':
+                area_code = 'TW' if area_code == '' else area_code
+                os = 'IOS' if source.get('os', '').lower() == 'ios' else 'Android'
+                if detail == 'register':  # 注册
                     data['table'] = 'oper_game_user'
                     data['columns'] = ['gamecode', 'servercode', 'regdate', 'userid', 'puid',
                                        'ip', 'os', 'areacode', 'regtime']
-                    data['values'] = [source['gamecode'], source['servercode'], time[:10], userid, puid,
+                    data['values'] = [game_code, server_code, time[:10], userid, puid,
                                       ip, os, area_code, time]
-                elif detail == 'login':
+                elif detail == 'login':  # 登录
                     data['table'] = 'oper_game_login'
                     data['columns'] = ['gamecode', 'servercode', 'logindate', 'userid', 'puid',
                                        'ip', 'os', 'areacode', 'logintime']
-                    data['values'] = [source['gamecode'], source['servercode'], time[:10], userid, puid,
+                    data['values'] = [game_code, server_code, time[:10], userid, puid,
                                       ip, os, area_code, time]
-                else:
+                elif detail == 'pay':  # 储值
                     data['table'] = 'oper_game_pay'
                     data['columns'] = ['gamecode', 'orderid', 'servercode', 'paydate', 'userid',
                                        'puid', 'ip', 'os', 'areacode', 'paytime',
                                        'amt']
-                    data['values'] = [source['gamecode'], source['order_id'], source['servercode'], time[:10], userid,
+                    data['values'] = [game_code, source['order_id'], server_code, time[:10], userid,
                                       puid, ip, os, area_code, time,
                                       source['amt']]
         if data is not None:
             self.into_db(data)
 
-        # 结束流程
+        # 返回None，结束流程
         result = None
         return result
 
@@ -114,5 +115,8 @@ class Pipeline(object):
         if db_type == 'mysql':
             mysql_db = mysql[db_name]
             mysql_db.insert(**data)
+        elif db_type == 'redis':
+            redis_db = redis[db_name]
+            getattr(redis_db, data.get('redis_set', 'set'))(**data)
         else:
-            raise ParameterError('db_type', ['mysql'])
+            raise ParameterError('db_type', ['mysql', 'redis'])

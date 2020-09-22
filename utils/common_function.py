@@ -229,3 +229,22 @@ def shell_run(shell, cwd=None, timeout=None, check=True, pr_std=True, **kwargs):
             stderr = result.stderr.decode('gbk')
         print('stderr：%s' % stderr)
     return result
+
+
+def timestamp_format(timestamp, format_='%Y-%m-%d %H:%M:%S', time_type='lt'):
+    """
+    时间戳格式化
+    :param timestamp:(type=int,float) 时间戳，注意单位是秒，毫秒请自行除以1000转换成秒
+    :param format_:(type=str) 格式化样式，默认“%Y-%m-%d %H:%M:%S”
+    :param time_type:(type=str) 要转换时间的时区，lt为本地时间，gt为格林威治时间（可用于把秒数格式化），默认本地时间
+    :return format_str:(type=str) 格式化时间
+    """
+
+    time_type = time_type.lower()
+    if time_type == 'lt':
+        format_str = time.strftime(format_, time.localtime(timestamp))
+    elif time_type == 'gt':
+        format_str = time.strftime(format_, time.gmtime(timestamp))
+    else:
+        raise ValueError('time_type只能为“lt”（本地时间）或“gt”（格林威治时间）！')
+    return format_str
