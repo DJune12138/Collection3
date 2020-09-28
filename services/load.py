@@ -8,6 +8,7 @@ from config import *
 from utils.logger import Logger
 from utils.mysql import MySQL, RepetitiveConnect as mysql_repetitive
 from utils.redis import Redis, RepetitiveConnect as redis_repetitive
+from utils.clickhouse import ClickHouse, RepetitiveConnect as clickhouse_repetitive
 
 
 def __get_argv():
@@ -102,6 +103,22 @@ def __get_mysql():
                 services.logger.exception('MySQL数据库（%s）重复连接！' % name)
 
 
+def __get_clickhouse():
+    """
+    加载ClickHouse数据库连接池
+    """
+
+    if services.clickhouse is None:
+        services.clickhouse = dict()
+        with open('%s/clickhouse.json' % account_name, 'r') as f:
+            clickhouse_account = json.load(f)
+        for name, info in clickhouse_account.items():
+            try:
+                services.clickhouse[name] = ClickHouse(**info)
+            except clickhouse_repetitive:
+                services.logger.exception('ClickHouse数据库（%s）重复连接！' % name)
+
+
 def load():
     """
     加载所有服务
@@ -112,3 +129,4 @@ def load():
     __get_redis()
     __get_logger()
     __get_mysql()
+    __get_clickhouse()

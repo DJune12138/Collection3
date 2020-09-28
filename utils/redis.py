@@ -98,7 +98,7 @@ class Redis(object):
     def __filter_repetition(cls, host, port, db):
         """
         校验相同配置的连接是否已经创建
-        :param host:(type=str) 数据库ip地址
+        :param host:(type=str) 数据库IP地址
         :param port:(type=int) 数据库端口
         :param db:(type=str) 数据库名
         """
@@ -117,6 +117,31 @@ class Redis(object):
         else:
             cls.__filter_container.add(fp)
 
+    def __execute(self, type_, key, **kwargs):
+        """
+        执行Redis操作
+        :param type_:(type=str) 执行的操作
+        :param key:(type=str) 键
+        :param kwargs:(type=dict) 关键字参数，具体参数
+        :return result:(type=bool,str,None,int) 执行结果
+        """
+
+        with redis.StrictRedis(connection_pool=self.__pool) as connection:
+            try:
+                if type_ == 'set':
+                    result = connection.set(key, kwargs['value'], ex=kwargs['ex'])
+                elif type_ == 'get':
+                    result = connection.get(key)
+                elif type_ == 'rpush':
+                    result = connection.rpush(key, *kwargs['values'])
+                elif type_ == 'lpop':
+                    result = connection.lpop(key)
+                else:
+                    result = None
+            except redis.exceptions.ConnectionError as e:
+                raise ConnectFailed(str(e))
+        return result
+
     def set(self, key, value, ex=None, **kwargs):
         """
         根据键，设置string类型的值
@@ -127,11 +152,7 @@ class Redis(object):
         :return result:(type=bool) 设置成功为True，否则为False
         """
 
-        with redis.StrictRedis(connection_pool=self.__pool) as connection:
-            try:
-                result = connection.set(key, value, ex=ex)
-            except redis.exceptions.ConnectionError as e:
-                raise ConnectFailed(str(e))
+        result = self.__execute('set', key, value=value, ex=ex)
         return result
 
     def get(self, key, **kwargs):
@@ -142,11 +163,7 @@ class Redis(object):
         :return result:(type=str,None) 值，没有结果则返回None
         """
 
-        with redis.StrictRedis(connection_pool=self.__pool) as connection:
-            try:
-                result = connection.get(key)
-            except redis.exceptions.ConnectionError as e:
-                raise ConnectFailed(str(e))
+        result = self.__execute('get', key)
         return result
 
     def rpush(self, key, values, **kwargs):
@@ -158,11 +175,7 @@ class Redis(object):
         :return result:(type=int) 插入成功后该list的长度
         """
 
-        with redis.StrictRedis(connection_pool=self.__pool) as connection:
-            try:
-                result = connection.rpush(key, *values)
-            except redis.exceptions.ConnectionError as e:
-                raise ConnectFailed(str(e))
+        result = self.__execute('rpush', key, values=values)
         return result
 
     def lpop(self, key, **kwargs):
@@ -173,9 +186,5 @@ class Redis(object):
         :return result:(type=str,None) 值，没有结果则返回None
         """
 
-        with redis.StrictRedis(connection_pool=self.__pool) as connection:
-            try:
-                result = connection.lpop(key)
-            except redis.exceptions.ConnectionError as e:
-                raise ConnectFailed(str(e))
+        result = self.__execute('lpop', key)
         return result

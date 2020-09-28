@@ -6,7 +6,7 @@
 from framework.object.response import Response
 from framework.error.check_error import ParameterError, LackParameter
 from utils import common_function as cf
-from services import mysql, redis
+from services import mysql, redis, clickhouse
 
 
 class Downloader(object):
@@ -49,17 +49,23 @@ class Downloader(object):
         # 根据db_type，获取对应数据库数据
         db_type = kwargs.get('db_type', 'mysql')
         db_name = kwargs.get('db_name')
-        if db_type == 'mysql':  # MySQL
+        if db_type == 'mysql':
             mysql_db = mysql[db_name]
             if kwargs.get('sql') is None:  # 根据有没有SQL语句，决定用什么函数
                 result = mysql_db.select(**kwargs)
             else:
                 result = mysql_db.execute(**kwargs)
-        elif db_type == 'redis':  # Redis
+        elif db_type == 'redis':
             redis_db = redis[db_name]
             result = getattr(redis_db, kwargs.get('redis_get', 'get'))(**kwargs)
+        elif db_type == 'clickhouse':
+            clickhouse_db = clickhouse[db_name]
+            if kwargs.get('sql') is None:
+                result = clickhouse_db.select(**kwargs)
+            else:
+                result = clickhouse_db.execute(**kwargs)
         else:
-            raise ParameterError('db_type', ['mysql', 'redis'])
+            raise ParameterError('db_type', ['mysql', 'redis', 'clickhouse'])
 
         # 返回数据
         return result

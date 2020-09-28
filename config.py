@@ -28,10 +28,10 @@ factory_config = {
 # 最大并发数
 # 必须为大于等于1的整数
 # 请根据机器性能配置该数字，并不是越大越好
-F_max_async = 50
+F_max_async = 12
 
 # 每个业务开启的并发
-F_every_async = 5
+F_every_async = 4
 
 """通用配置"""
 

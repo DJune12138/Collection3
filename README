@@ -26,6 +26,7 @@
     -- __init__.py                 --> 具体公共服务对象
     -- load.py                     --> 加载公共服务
   -- utils                         --> 工具包
+    -- clickhouse.py               --> ClickHouse数据库连接池
     -- common_function.py          --> 非业务公共函数
     -- common_profession.py        --> 业务公共函数
     -- logger.py                   --> 日志器

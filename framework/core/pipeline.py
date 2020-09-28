@@ -5,7 +5,7 @@
 
 from framework.object.request import Request
 from framework.error.check_error import ParameterError
-from services import mysql, redis
+from services import mysql, redis, clickhouse
 from utils import common_profession as cp
 
 
@@ -118,5 +118,8 @@ class Pipeline(object):
         elif db_type == 'redis':
             redis_db = redis[db_name]
             getattr(redis_db, data.get('redis_set', 'set'))(**data)
+        elif db_type == 'clickhouse':
+            clickhouse_db = clickhouse[db_name]
+            clickhouse_db.insert(**data)
         else:
-            raise ParameterError('db_type', ['mysql', 'redis'])
+            raise ParameterError('db_type', ['mysql', 'redis', 'clickhouse'])

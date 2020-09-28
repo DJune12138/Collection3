@@ -16,3 +16,6 @@ logger = None
 
 # MySQL数据库连接池
 mysql = None
+
+# ClickHouse数据库连接池
+clickhouse = None

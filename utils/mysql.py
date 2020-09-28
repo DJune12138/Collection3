@@ -144,7 +144,7 @@ class MySQL(object):
     def __filter_repetition(cls, host, port, user, db):
         """
         校验相同配置的连接是否已经创建
-        :param host:(type=str) 数据库ip地址
+        :param host:(type=str) 数据库IP地址
         :param port:(type=int) 数据库端口
         :param user:(type=str) 登录数据库的账号名
         :param db:(type=str) 数据库名

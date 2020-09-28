@@ -63,7 +63,7 @@ class Engine(object):
             # 异步任务相关
             self.__while_run = True  # 引擎是否继续循环启动的标志
             self.__is_running = False  # 引擎是否运作的标志
-            self.__pool = Pool()  # 进程池
+            self.__pool = None  # 线程池，校验过配置的最大并发数后再创建
             self.request_mutex = Lock()  # 请求数互斥锁
             self.response_mutex = Lock()  # 响应数互斥锁
             self.error_mutex = Lock()  # 错误数互斥锁
@@ -456,10 +456,13 @@ class Engine(object):
         # 默认有多少个业务，就开启多少倍并发
         # 如果业务数大于控制的最大并发数，则使用配置的最大并发数
         # 可通过传参灵活控制并发倍数
-        if not isinstance(F_max_async, int) or F_max_async < 1:
-            raise CheckUnPass('配置config中的最大并发数F_max_async不为int类型或小于1，请修改！')
-        if not isinstance(F_every_async, int) or F_every_async < 1:
-            raise CheckUnPass('配置config中的并发倍数F_every_async不为int类型或小于1，请修改！')
+        # 第一次循环启动引擎才做校验，后面都不需要做校验，校验通过则创建线程池
+        if self.__pool is None:
+            if not isinstance(F_max_async, int) or F_max_async < 1:
+                raise CheckUnPass('配置config中的最大并发数F_max_async不为int类型或小于1，请修改！')
+            if not isinstance(F_every_async, int) or F_every_async < 1:
+                raise CheckUnPass('配置config中的并发倍数F_every_async不为int类型或小于1，请修改！')
+            self.__pool = Pool(F_max_async)
         argv_ea = getattr(argv, pk_ea.replace('-', '_'))
         if argv_ea is not None:
             try:
@@ -476,7 +479,10 @@ class Engine(object):
         self.__pool.apply_async(self.__start_request, args=(request_type,), error_callback=self.__error_callback)
 
         # 异步处理解析过程中产生的请求
-        for i in range(async_count if async_count <= F_max_async else F_max_async):
+        real_count = async_count if async_count <= F_max_async else F_max_async
+        if request_type == 'start_requests':
+            cf.print_log('实际开启并发数%s！' % real_count)
+        for i in range(real_count):
             self.__pool.apply_async(self.__execute_request_response_item, callback=self.__call_back,
                                     error_callback=self.__error_callback)
 
@@ -503,15 +509,13 @@ class Engine(object):
             while True:
                 request_type = 'end_requests_%s' % end_num
                 self.__start_engine(request_type)
-                if not self.__while_run or end_num >= 10:  # 防止未知BUG导致死循环，限制10次内结束
+                if not self.__while_run or end_num >= 10:  # 防止未知BUG导致死循环，限制10次内结束，根据实际需求再调整
                     cf.print_log('%s没有请求任务，引擎循环启动结束！' % request_type)
                     break
                 end_num += 1
         except CheckUnPass as e:
             logger.exception(e)
-            sys.exit()
         except Exception as e:
             logger.ding_exception(self.__f_exception, e, self.framework_key)
-            sys.exit()
         cf.print_log('总共完成业务%s个！添加请求%s个，完成响应%s个，其中错误响应%s个！' % (
             self.__builders_num, self.total_request_nums, self.total_response_nums, self.total_error_nums))

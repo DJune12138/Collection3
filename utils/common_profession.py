@@ -188,7 +188,7 @@ def ip_belong(ip, redis='127_0'):
             services.logger.exception(e)
         else:
             code = response.country.iso_code  # 英文简称
-            name = response.country.names['zh-CN']  # 中文全称
+            name = response.country.names.get('zh-CN', '')  # 中文全称
     result = {'code': code, 'name': name}
 
     # 缓存结果
