@@ -4,9 +4,10 @@
 
 import os
 import json
+from datetime import datetime
 from geoip2 import database as geoip2_db, errors as geoip2_e
 import services  # 该模块在加载服务前就已经被导入，只能导入总模块，否则所有服务都会是加载前的None
-from config import ding_token, factory_config, factory_code, pegging_redis, geoip2_path
+from config import ding_token, factory_config, factory_code, pegging_redis, geoip2_path, pk_st, pk_et, gc_interval
 from utils import common_function as cf
 
 
@@ -197,3 +198,40 @@ def ip_belong(ip, redis='127_0'):
 
     # 返回结果
     return result
+
+
+def time_quantum(dt_format=None):
+    """
+    根据脚本传参，返回开始与结束时间，所有时间均自动转化为整十分
+    1.开始时间与结束时间均没有传入，则结束时间为当前时间，开始时间为上一个节点
+    2.只传入开始时间，则结束时间为开始时间的下一个节点
+    3.只传入结束时间，则开始时间为结束时间的上一个节点
+    4.开始时间与结束时间均有传入，则使用传入时间
+    :param dt_format:(type=str) 返回格式化时间的格式，默认None则直接返回datetime对象
+    :return:
+    """
+
+    # 基础参数
+    format_ = '%Y%m%d%H%M'
+    now_datetime = services.launch['datetime']
+    start_time = getattr(services.argv, pk_st.replace('-', '_'))
+    end_time = getattr(services.argv, pk_et.replace('-', '_'))
+
+    # 根据规则转化时间
+    if start_time is None and end_time is None:
+        end_datetime = datetime.strptime(now_datetime.strftime(format_)[:-1] + '0', format_)
+        start_datetime = cf.datetime_timedelta('minutes', 0 - gc_interval, date_time=end_datetime)
+    elif start_time is not None and end_time is None:
+        start_datetime = datetime.strptime(start_time[:-1] + '0', format_)
+        end_datetime = cf.datetime_timedelta('minutes', gc_interval, date_time=start_datetime)
+    elif start_time is None and end_time is not None:
+        end_datetime = datetime.strptime(end_time[:-1] + '0', format_)
+        start_datetime = cf.datetime_timedelta('minutes', 0 - gc_interval, date_time=end_datetime)
+    else:
+        start_datetime = datetime.strptime(start_time[:-1] + '0', format_)
+        end_datetime = datetime.strptime(end_time[:-1] + '0', format_)
+
+    # 返回结束
+    if dt_format is not None:
+        start_datetime, end_datetime = start_datetime.strftime(dt_format), end_datetime.strftime(dt_format)
+    return start_datetime, end_datetime

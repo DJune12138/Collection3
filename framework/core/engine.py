@@ -320,9 +320,13 @@ class Engine(object):
         # 1.调用建造器，获取请求对象列表
         no_task = True  # 该点是否没有任务的标记
         for builder_name, builder in self.__builders.items():
+            a_gc = True if builder.auto_gc and request_type == 'start_requests' else False  # 通用流程标记
             try:
                 try:
-                    start_list = self.__check_return(self.__check_argument(getattr(builder, request_type)))  # 校验是否yield
+                    if a_gc:  # 使用通用的游戏数据采集流程
+                        start_list = self.__check_return(self.__check_argument(builder.auto_game_collection))
+                    else:  # 其余走正常流程
+                        start_list = self.__check_return(self.__check_argument(getattr(builder, request_type)))
                 except AttributeError:
                     continue
                 else:
@@ -342,7 +346,8 @@ class Engine(object):
             # 处理异常
             except FaultReturn:  # 校验yield不通过
                 self.__add_request(Request('test', parse='_funny'), builder_name)  # 彩蛋请求，作用同上
-                logger.exception(self.__fr_warning.format(builder_name, 'start_requests'))
+                logger.exception(self.__fr_warning.format(
+                    builder_name, 'auto_game_collection' if a_gc else request_type))
             except TypeDifferent:  # 校验类型不通过
                 self.__add_request(Request('test', parse='_funny'), builder_name)
                 logger.exception(self.__td_warning.format(builder_name))

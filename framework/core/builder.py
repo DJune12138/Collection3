@@ -7,6 +7,7 @@
 from framework.object.request import Request
 from framework.object.item import Item
 from framework.error.check_error import CheckUnPass
+from utils import common_profession as cp, common_function as cf
 
 
 class Builder(object):
@@ -25,6 +26,15 @@ class Builder(object):
     # 元素必须为dict类型，且必须有“way”这对键值
     # 原生start_requests函数会把列表中每一个mapping作为关键字参数构建请求对象
     start = [{'way': 'test', 'parse': '_funny'}]
+
+    # 是否使用通用的游戏数据采集流程
+    # 继承类后可重写该属性，True为使用，False为不使用，不重写则默认不使用
+    # 如果使用通用流程，则不再进入start_requests函数，而进入auto_game_collection函数
+    auto_gc = False
+
+    # 如使用通用的游戏数据采集流程，以下信息必须继承重写
+    game_code = None  # 游戏代码，建议大写，类型为字符串
+    platform = None  # 游戏所属平台，类型为字符串：晶绮（jq）、初心（cx）、和悦（hy）
 
     def _funny(self, response):
         """
@@ -70,6 +80,125 @@ class Builder(object):
         """
 
         raise e
+
+    def auto_game_collection(self):
+        """
+        1.使用通用的游戏数据采集流程
+        2.通用流程：取公司平台SDK数据（在线除外） → 入库明细表
+        3.此方法一般不需要继承重写，是固定的流程
+        :return request:(type=Request) 内置请求对象
+        """
+
+        # 注册、登录、储值
+        db_name = '%s_sdk' % self.platform  # 查询数据库
+        str_format = '%Y-%m-%d %H:%M:%S'
+        start, end = cp.time_quantum(dt_format=str_format)  # 开始与结束时间
+        start = cf.change_time_format(start, before=str_format, after='%Y-%m-%d 00:00:00')  # SDK有延迟，从开始时间当天0点重新获取
+        info_list = [
+            # 注册
+            {'way': 'db', 'parse': 'auto_game_parse', 'meta': 'register', 'db_name': db_name, 'table': 'oper_game_user',
+             'columns': ['userid', 'comefrom', 'ipaddr', 'regdate', 'serid'],
+             'after_table': 'WHERE gamecode="%s" AND (regdate BETWEEN "%s" AND "%s")' % (self.game_code, start, end)},
+            # 登录
+            {'way': 'db', 'parse': 'auto_game_parse', 'meta': 'login', 'db_name': db_name,
+             'table': 'oper_game_login AS a,oper_game_user AS b',
+             'columns': ['a.userid', 'a.comefrom', 'a.ipaddr', 'a.crtime', 'a.serid'],
+             'after_table': 'WHERE a.gamecode=b.gamecode AND a.serid=b.serid AND a.userid=b.userid AND '
+                            'b.regdate<="%s" AND a.gamecode="%s" AND (a.indate BETWEEN "%s" AND "%s") AND (a.crtime '
+                            'BETWEEN "%s" AND "%s")' % (
+                                end, self.game_code, cf.change_time_format(start, before=str_format, after='%Y-%m-%d'),
+                                cf.change_time_format(end, before=str_format, after='%Y-%m-%d'), start, end)},
+        ]
+        pay_info = cp.game_money_dict(self.platform, self.game_code, start, end)  # 储值
+        pay_info['parse'] = 'auto_game_parse'
+        info_list.append(pay_info)
+        for info in info_list:
+            request = self.request(**info)
+            yield request
+
+        # 在线，需自行编写
+        # 在线要在后面获取，否则有概率发生引擎过快关闭的情况
+        request = self.request('test', parse='auto_online_collection')
+        yield request
+
+    def auto_game_parse(self, response):
+        """
+        通用游戏数据采集流程，入库明细表
+        :param response:(type=Response) 引擎回传的响应对象
+        :return item:(type=Item) 入库明细表的内置数据对象
+        """
+
+        # 获取数据标识与源数据
+        key = response.meta
+        source_data = response.data
+        cf.print_log('（通用游戏数据采集流程）获取到%s游戏的%s数据，数据长度%s！' % (self.game_code, key, len(source_data)))
+
+        # 通用参数
+        str_format = '%Y-%m-%d %H:%M:%S'
+
+        # 在线
+        if key == 'online':
+            server_code = str(source_data['server_code'])
+            time = source_data['time'][:-4] + '0:00'
+            count = int(source_data['count'])
+            data = {
+                'platform': self.platform,
+                'source': {'gamecode': self.game_code, 'servercode': server_code, 'time': time,
+                           'count': count}
+            }
+            yield self.item(data, detail=key)
+
+        # 注册、登录
+        elif key in ('register', 'login'):
+            for one_data in source_data:
+                user_id = str(one_data['userid'])
+                ip = one_data['ipaddr']
+                server_code = str(one_data['serid'])
+                os = one_data['comefrom']
+                time = one_data['regdate'].strftime(str_format) if key == 'register' else one_data['crtime'].strftime(
+                    str_format)
+                data = {
+                    'platform': self.platform,
+                    'source': {'gamecode': self.game_code, 'servercode': server_code, 'userid': user_id, 'ip': ip,
+                               'os': os, 'time': time}
+                }
+                yield self.item(data, detail=key)
+                if key == 'register':  # 注册还需要同时录入一条登录
+                    yield self.item(data, detail='login')
+
+        # 储值
+        elif key == 'pay':
+            for one_data in source_data:
+                order_id = one_data['gd_orderid']
+                server_code = str(one_data['servercode'])
+                user_id = str(one_data['userid'])
+                os = one_data['comefrom']
+                time = one_data['create_time'].strftime(str_format)
+                amt = one_data['epoint']
+                ip = one_data['user_ip']
+                data = {
+                    'platform': self.platform,
+                    'source': {'gamecode': self.game_code, 'order_id': order_id, 'servercode': server_code,
+                               'userid': user_id, 'os': os, 'time': time, 'amt': amt, 'ip': ip}
+                }
+                yield self.item(data, detail=key)
+
+    def auto_online_collection(self, response):
+        """
+        公司平台暂时没有在线数据，只能由原厂提供，需要继承重写此函数获取在线数据
+        1.此函数一般都需要重写，除非原厂没提供获取在线数的方法，那就没有在线数据了
+        2.可自定义新函数入库在线数据，也可以用默认函数
+        3.如果使用默认函数入库，需遵守下面的规则：
+            ① yield出去的Request对象要带上meta属性，为online
+            ② data属性为一个字典，伺服器编码的key为server_code
+            ③ 续②，时间节点的key为time，格式“%Y-%m-%d %H:%M:%S”
+            ④ 续②，在线数的key为count，应该是一个数字
+        :param response:(type=Response) 引擎回传的响应对象
+        :return item:(type=Item,Request) 内置数据、请求对象
+        """
+
+        item = self.item(None)
+        yield item
 
     @staticmethod
     def request(*args, **kwargs):
