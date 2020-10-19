@@ -124,7 +124,7 @@ ding_token = {
 }
 
 # 同类型（特征值相同）钉钉消息发送间隔（单位：秒）
-ding_interval = 14100  # 4小时减5分钟
+ding_interval = 7200  # 2小时
 
 # 游戏采集时间节点间隔（单位：分）
 gc_interval = 10

@@ -99,7 +99,7 @@ class Downloader(object):
             data = self.__shell(kwargs)
         elif way == 'test':
             print('这是一个彩蛋๑乛◡乛๑，业务名称为%s。' % request.builder_name)
-            data = None
+            data = kwargs.get('test_data')
         else:
             raise ParameterError('way', ['“web”（获取网络数据）', '“db”（获取数据库数据）', '“shell”（执行shell命令并获取返回数据）'])
 

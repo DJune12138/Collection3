@@ -54,7 +54,7 @@ def send_ding(msg, e, group):
     return result
 
 
-def game_money_dict(platform, game_code, start, end, e_point=False):
+def game_money_dict(platform, game_code, start, end, e_point=False, server=None):
     """
     构造获取平台储值的字典，用于构造请求
     :param platform:(type=str) 哪个平台，晶绮jq、和悦hy、初心cx
@@ -62,6 +62,7 @@ def game_money_dict(platform, game_code, start, end, e_point=False):
     :param start:(type=str) 查询时间段的开始时间
     :param end:(type=str) 查询时间段的结束时间
     :param e_point:(type=bool) 使用“epoint>0”的条件，默认不使用
+    :param server:(type=list,tuple) 指定伺服器，注意里面的元素必须要str类型，默认None不指定
     :return request_dict:(type=dict) 用于构造内置请求对象所用参数的字典
     """
 
@@ -80,8 +81,13 @@ def game_money_dict(platform, game_code, start, end, e_point=False):
 
     # 查询条件
     e_point = ' AND epoint>0' if e_point else ''
-    after_table = 'WHERE gamecode="%s" AND (create_time BETWEEN "%s" AND "%s") AND status IN (1,4)%s' % (
-        game_code, start, end, e_point)
+    if server:
+        server_list = ['"%s"' % one_server for one_server in server]
+        server = ' AND servercode in (%s)' % ','.join(server_list)
+    else:
+        server = ''
+    after_table = 'WHERE gamecode="%s" AND (create_time BETWEEN "%s" AND "%s") AND status IN (1,4)%s%s' % (
+        game_code, start, end, e_point, server)
 
     # 储值标识
     meta = 'pay'
@@ -235,3 +241,35 @@ def time_quantum(dt_format=None):
     if dt_format is not None:
         start_datetime, end_datetime = start_datetime.strftime(dt_format), end_datetime.strftime(dt_format)
     return start_datetime, end_datetime
+
+
+def osa_server_dict(platform, game_code):
+    """
+    构造获取OSA配置的伺服器的字典，用于构造请求
+    :param platform:(type=str) 哪个平台，晶绮jq、和悦hy、初心cx
+    :param game_code:(type=str) 游戏代码
+    :return request_dict:(type=dict) 用于构造内置请求对象所用参数的字典
+    """
+
+    # 采集方式
+    way = 'db'
+
+    # 数据库
+    db_name = 'osa_%s' % platform
+
+    # 表名
+    table = 'gameservers'
+
+    # 查询字段
+    columns = ['servercode']
+
+    # 查询条件
+    after_table = 'WHERE gamecode="%s"' % game_code
+
+    # 伺服器标识
+    meta = 'server'
+
+    # 构造字典并返回
+    request_dict = {'way': way, 'db_name': db_name, 'table': table, 'columns': columns, 'after_table': after_table,
+                    'meta': meta}
+    return request_dict

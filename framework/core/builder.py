@@ -32,6 +32,9 @@ class Builder(object):
     # 如果使用通用流程，则不再进入start_requests函数，而进入auto_game_collection函数
     auto_gc = False
 
+    # 如使用通用的游戏数据采集流程（auto_gc为True），则会根据该参数判定是否只获取OSA配置的伺服器的数据，默认False
+    osa_server = False
+
     # 如使用通用的游戏数据采集流程，以下信息必须继承重写
     game_code = None  # 游戏代码，建议大写，类型为字符串
     platform = None  # 游戏所属平台，类型为字符串：晶绮（jq）、初心（cx）、和悦（hy）
@@ -81,45 +84,69 @@ class Builder(object):
 
         raise e
 
-    def auto_game_collection(self):
+    def auto_game_collection(self, response=None):
         """
         1.使用通用的游戏数据采集流程
         2.通用流程：取公司平台SDK数据（在线除外） → 入库明细表
         3.此方法一般不需要继承重写，是固定的流程
+        :param response:(type=Response) 引擎回传的响应对象，这个函数较为特殊，引擎初次调用时默认为None
         :return request:(type=Request) 内置请求对象
         """
 
-        # 注册、登录、储值
-        db_name = '%s_sdk' % self.platform  # 查询数据库
-        str_format = '%Y-%m-%d %H:%M:%S'
-        start, end = cp.time_quantum(dt_format=str_format)  # 开始与结束时间
-        start = cf.change_time_format(start, before=str_format, after='%Y-%m-%d 00:00:00')  # SDK有延迟，从开始时间当天0点重新获取
-        info_list = [
-            # 注册
-            {'way': 'db', 'parse': 'auto_game_parse', 'meta': 'register', 'db_name': db_name, 'table': 'oper_game_user',
-             'columns': ['userid', 'comefrom', 'ipaddr', 'regdate', 'serid'],
-             'after_table': 'WHERE gamecode="%s" AND (regdate BETWEEN "%s" AND "%s")' % (self.game_code, start, end)},
-            # 登录
-            {'way': 'db', 'parse': 'auto_game_parse', 'meta': 'login', 'db_name': db_name,
-             'table': 'oper_game_login AS a,oper_game_user AS b',
-             'columns': ['a.userid', 'a.comefrom', 'a.ipaddr', 'a.crtime', 'a.serid'],
-             'after_table': 'WHERE a.gamecode=b.gamecode AND a.serid=b.serid AND a.userid=b.userid AND '
-                            'b.regdate<="%s" AND a.gamecode="%s" AND (a.indate BETWEEN "%s" AND "%s") AND (a.crtime '
-                            'BETWEEN "%s" AND "%s")' % (
-                                end, self.game_code, cf.change_time_format(start, before=str_format, after='%Y-%m-%d'),
-                                cf.change_time_format(end, before=str_format, after='%Y-%m-%d'), start, end)},
-        ]
-        pay_info = cp.game_money_dict(self.platform, self.game_code, start, end)  # 储值
-        pay_info['parse'] = 'auto_game_parse'
-        info_list.append(pay_info)
-        for info in info_list:
-            request = self.request(**info)
-            yield request
+        # 只获取OSA配置的伺服器的数据
+        if self.osa_server and response is None:
+            server_dict = cp.osa_server_dict(self.platform, self.game_code)
+            server_dict['parse'] = 'auto_game_collection'
+            yield self.request(**server_dict)
 
-        # 在线，需自行编写
-        # 在线要在后面获取，否则有概率发生引擎过快关闭的情况
-        request = self.request('test', parse='auto_online_collection')
-        yield request
+        # 注册、登录、储值
+        if not self.osa_server or response is not None:
+            server, register_where, login_where = None, '', ''
+            if self.osa_server:
+                server_data = response.data
+                if len(server_data):
+                    cf.print_log('（通用游戏数据采集流程）%s游戏只获取OSA配置的伺服器的数据！' % self.game_code)
+                    server, str_server = list(), list()
+                    for one_server in server_data:
+                        server.append(str(one_server['servercode']))
+                        str_server.append('"%s"' % one_server)
+                    register_where = ' AND serid in (%s)' % ','.join(str_server)
+                    login_where = ' AND a.serid in (%s)' % ','.join(str_server)
+            db_name = '%s_sdk' % self.platform  # 查询数据库
+            str_format = '%Y-%m-%d %H:%M:%S'
+            start, end = cp.time_quantum(dt_format=str_format)  # 开始与结束时间
+            start = cf.change_time_format(start, before=str_format, after=str_format,
+                                          interval=-1200)  # SDK延迟，开始时间推前20分钟
+            info_list = [
+                # 注册
+                {'way': 'db', 'parse': 'auto_game_parse', 'meta': 'register', 'db_name': db_name,
+                 'table': 'oper_game_user',
+                 'columns': ['userid', 'comefrom', 'ipaddr', 'regdate', 'serid'],
+                 'after_table': 'WHERE gamecode="%s" AND (regdate BETWEEN "%s" AND "%s")%s' % (
+                     self.game_code, start, end, register_where)},
+                # 登录
+                {'way': 'db', 'parse': 'auto_game_parse', 'meta': 'login', 'db_name': db_name,
+                 'table': 'oper_game_login AS a,oper_game_user AS b',
+                 'columns': ['a.userid', 'a.comefrom', 'a.ipaddr', 'a.crtime', 'a.serid'],
+                 'after_table': 'WHERE a.gamecode=b.gamecode AND a.serid=b.serid AND a.userid=b.userid AND '
+                                'b.regdate<="%s" AND a.gamecode="%s" AND (a.indate BETWEEN "%s" AND "%s") AND ('
+                                'a.crtime BETWEEN "%s" AND "%s")%s' % (
+                                    end, self.game_code,
+                                    cf.change_time_format(start, before=str_format, after='%Y-%m-%d'),
+                                    cf.change_time_format(end, before=str_format, after='%Y-%m-%d'), start, end,
+                                    login_where)}
+            ]
+            pay_info = cp.game_money_dict(self.platform, self.game_code, start, end, server=server)  # 储值
+            pay_info['parse'] = 'auto_game_parse'
+            info_list.append(pay_info)
+            for info in info_list:
+                request = self.request(**info)
+                yield request
+
+            # 在线，需自行编写
+            # 在线要在后面获取，否则有概率发生引擎过快关闭的情况
+            request = self.request('test', parse='auto_online_collection')
+            yield request
 
     def auto_game_parse(self, response):
         """
@@ -189,10 +216,12 @@ class Builder(object):
         1.此函数一般都需要重写，除非原厂没提供获取在线数的方法，那就没有在线数据了
         2.可自定义新函数入库在线数据，也可以用默认函数
         3.如果使用默认函数入库，需遵守下面的规则：
-            ① yield出去的Request对象要带上meta属性，为online
-            ② data属性为一个字典，伺服器编码的key为server_code
-            ③ 续②，时间节点的key为time，格式“%Y-%m-%d %H:%M:%S”
-            ④ 续②，在线数的key为count，应该是一个数字
+            ① yield出去的Request对象，way属性为字符串test
+            ② 续①，带上parse属性，为字符串auto_game_parse
+            ③ 续①，带上meta属性，为字符串online
+            ④ 续①，带上test_data属性，为一个字典，伺服器编码的key为server_code
+            ⑤ 续④，时间节点的key为time，格式“%Y-%m-%d %H:%M:%S”
+            ⑥ 续④，在线数的key为count，应该是一个数字
         :param response:(type=Response) 引擎回传的响应对象
         :return item:(type=Item,Request) 内置数据、请求对象
         """

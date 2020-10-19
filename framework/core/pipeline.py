@@ -58,8 +58,8 @@ class Pipeline(object):
                 userid = source['userid']
                 puid = source.get('puid') if source.get('puid') else userid
                 ip = source.get('ip', '')
-                area_code = cp.ip_belong(ip)['code']
-                area_code = 'TW' if area_code == '' else area_code
+                area = cp.ip_belong(ip)['code']
+                area_code = 'TW' if area == '' else area
                 os = 'IOS' if source.get('os', '').lower() == 'ios' else 'Android'
                 if detail == 'register':  # 注册
                     data['table'] = 'oper_game_user'
