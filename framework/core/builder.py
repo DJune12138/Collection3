@@ -8,6 +8,7 @@ from framework.object.request import Request
 from framework.object.item import Item
 from framework.error.check_error import CheckUnPass
 from utils import common_profession as cp, common_function as cf
+from services import launch
 
 
 class Builder(object):
@@ -101,17 +102,16 @@ class Builder(object):
 
         # 注册、登录、储值
         if not self.osa_server or response is not None:
+            server_data = response.data
             server, register_where, login_where = None, '', ''
-            if self.osa_server:
-                server_data = response.data
-                if len(server_data):
-                    cf.print_log('（通用游戏数据采集流程）%s游戏只获取OSA配置的伺服器的数据！' % self.game_code)
-                    server, str_server = list(), list()
-                    for one_server in server_data:
-                        server.append(str(one_server['servercode']))
-                        str_server.append('"%s"' % one_server)
-                    register_where = ' AND serid in (%s)' % ','.join(str_server)
-                    login_where = ' AND a.serid in (%s)' % ','.join(str_server)
+            if self.osa_server and len(server_data):
+                cf.print_log('（通用游戏数据采集流程）%s游戏只获取OSA配置的伺服器的数据！' % self.game_code)
+                server, str_server = list(), list()
+                for one_server in server_data:
+                    server.append(str(one_server['servercode']))
+                    str_server.append('"%s"' % one_server['servercode'])
+                register_where = ' AND serid in (%s)' % ','.join(str_server)
+                login_where = ' AND a.serid in (%s)' % ','.join(str_server)
             db_name = '%s_sdk' % self.platform  # 查询数据库
             str_format = '%Y-%m-%d %H:%M:%S'
             start, end = cp.time_quantum(dt_format=str_format)  # 开始与结束时间
@@ -145,7 +145,8 @@ class Builder(object):
 
             # 在线，需自行编写
             # 在线要在后面获取，否则有概率发生引擎过快关闭的情况
-            request = self.request('test', parse='auto_online_collection')
+            # meta带上的server在有数据的情况下为一个列表，里面元素为字符串，是OSA配置的伺服器列表
+            request = self.request('test', parse='auto_online_collection', meta=server)
             yield request
 
     def auto_game_parse(self, response):
@@ -166,7 +167,7 @@ class Builder(object):
         # 在线
         if key == 'online':
             server_code = str(source_data['server_code'])
-            time = source_data['time'][:-4] + '0:00'
+            time = source_data.get('time', launch['datetime'].strftime('%Y-%m-%d %H:%M:%S'))[:-4] + '0:00'
             count = int(source_data['count'])
             data = {
                 'platform': self.platform,
