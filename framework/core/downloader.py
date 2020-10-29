@@ -3,6 +3,8 @@
 1.根据请求对象，发起请求（网络请求、数据库查询请求等），拿到数据，构建响应对象并返回
 """
 
+from threading import Lock
+from time import sleep
 from framework.object.response import Response
 from framework.error.check_error import ParameterError, LackParameter
 from utils import common_function as cf
@@ -14,8 +16,16 @@ class Downloader(object):
     下载器组件
     """
 
-    @staticmethod
-    def __web(kwargs):
+    def __init__(self):
+        """
+        下载器不用于继承，每次启动程序只有一个实例，可以直接在init实现初始化
+        """
+
+        # web方法限流用
+        self.web_lock = dict()  # 存储线程锁
+        self.web_first = set()  # 存储“首跳”
+
+    def __web(self, kwargs):
         """
         发起网络请求，获取响应数据
         1.下载信息里，必须带上url参数，是请求的地址
@@ -28,6 +38,24 @@ class Downloader(object):
         # 校验有没有url参数
         if kwargs.get('url') is None:
             raise LackParameter(['url'])
+
+        # 限流保护机制
+        # 1.如果请求对象带上web_limit参数，将启动限流保护机制
+        # 2.web_limit应该为字符串，是一个唯一标识，建议带上业务名称，可进一步增加唯一性
+        # 3.启动限流保护机制后，如first_pass为True，则第一次访问不会阻塞，默认True
+        # 4.根据limit_s阻塞多少秒，应为float或int
+        web_limit = kwargs.get('web_limit')
+        if isinstance(web_limit, str):
+            lock = self.web_lock.setdefault(web_limit, Lock())
+            with lock:
+                limit_s = kwargs.get('limit_s', 0)
+                if kwargs.get('first_pass', True):
+                    if web_limit not in self.web_first:
+                        self.web_first.add(web_limit)
+                    else:
+                        sleep(limit_s)
+                else:
+                    sleep(limit_s)
 
         # 发起请求，返回响应
         # 根据json参数确定是返回原生响应对象还是响应体解析json后的数据

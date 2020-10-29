@@ -5,8 +5,9 @@
 
 from framework.object.request import Request
 from framework.error.check_error import ParameterError
-from services import mysql, redis, clickhouse
+from services import mysql, redis, clickhouse, logger
 from utils import common_profession as cp
+from utils.mysql import ExecuteError
 
 
 class Pipeline(object):
@@ -114,7 +115,13 @@ class Pipeline(object):
         db_name = data.get('db_name')
         if db_type == 'mysql':
             mysql_db = mysql[db_name]
-            mysql_db.insert(**data)
+            try:
+                mysql_db.insert(**data)
+            except ExecuteError as e:
+                if 'Lock wait timeout exceeded' in str(e):  # 多线程引发的唯一键冲突，有一定概率发生，暂没有好办法避免，目前先不用发钉钉
+                    logger.exception('多线程下概率引发的唯一键冲突！')
+                else:
+                    raise e
         elif db_type == 'redis':
             redis_db = redis[db_name]
             getattr(redis_db, data.get('redis_set', 'set'))(**data)

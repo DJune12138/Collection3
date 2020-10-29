@@ -116,7 +116,7 @@ class Builder(object):
             str_format = '%Y-%m-%d %H:%M:%S'
             start, end = cp.time_quantum(dt_format=str_format)  # 开始与结束时间
             start = cf.change_time_format(start, before=str_format, after=str_format,
-                                          interval=-1200)  # SDK延迟，开始时间推前20分钟
+                                          interval=-3000)  # SDK延迟，开始时间推前50分钟
             info_list = [
                 # 注册
                 {'way': 'db', 'parse': 'auto_game_parse', 'meta': 'register', 'db_name': db_name,
