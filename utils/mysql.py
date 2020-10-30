@@ -262,9 +262,14 @@ class MySQL(object):
         else:
             columns = ''
 
-        # 拼接插入值
+        # 校验values
         if not isinstance(values, list):
             raise MySQLError('values参数类型应该为list！')
+        if len(values) == 0:
+            cf.print_log('values为空！跳过本次插入MySQL！')
+            return
+
+        # 拼接插入值
         if isinstance(values[0], list):  # 插入多条数据
             values = ','.join(['(%s)' % ','.join(['"%s"' % self.__replace_value(value) for value in one_data])
                                for one_data in values])

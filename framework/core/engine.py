@@ -394,8 +394,9 @@ class Engine(object):
             try:
                 response = self.__downloader.get_response(request)
             except Exception as e:  # 下载过程中出错，把原生错误对象与请求对象交回给建造器处理
-                builder.downloader_error_callback(e, request)
-                self.__statistics_lock('response')
+                result = builder.downloader_error_callback(e, request)
+                if isinstance(result, Request):  # 如果返回的是一个请求对象，则再次添加去调度器
+                    self.__add_request(result, builder_name)
                 return
             response = self.__check_return(self.__check_argument(
                 downloader_mw.process_response, response), right_obj=Response)  # 下载器响应处理

@@ -15,11 +15,13 @@ from factory import factory_code
 factory_config = {
     1: {
         'logger_config.log_path': None,  # 日志保存路径
-        'geoip2_path': r'D:\software\Python38\Lib\site-packages\_geoip_geolite2\GeoLite2-City.mmdb'  # geoip2驱动路径
+        'geoip2_path': r'D:\software\Python38\Lib\site-packages\_geoip_geolite2\GeoLite2-City.mmdb',  # geoip2驱动路径
+        'ding_is_send': False,  # 是否发送钉钉
     },
     2: {
         'logger_config.log_path': '/data/logs/c3_logs',
-        'geoip2_path': '/data/lib/geoipdb/GeoLite2-City.mmdb'
+        'geoip2_path': '/data/lib/geoipdb/GeoLite2-City.mmdb',
+        'ding_is_send': True
     }
 }
 
@@ -122,6 +124,7 @@ ding_token = {
     dk_plan: '551f99239793cc8490769a4325abbed0243114f26cfc06e67664ad30abbac839',  # 计划任务
     dk_live: 'fa66808a722dd7b2a147d47cc13a6d8e9db71b9d01ff2e613f2005c3cd30d881'  # 直播后台
 }
+ding_is_send = factory_config[factory_code]['ding_is_send']
 
 # 同类型（特征值相同）钉钉消息发送间隔（单位：秒）
 ding_interval = 7200  # 2小时

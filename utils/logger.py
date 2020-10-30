@@ -48,7 +48,7 @@ import time
 import logging
 from threading import Lock
 import services
-from config import dk_plan, ding_interval
+from config import dk_plan, ding_interval, ding_is_send
 from utils import common_function as cf, common_profession as cp
 
 
@@ -146,8 +146,10 @@ class Logger(object):
         :param kwargs:(type=dict) 其余的执行日志器原生exception方法的参数
         """
 
-        # 执行日志器原生exception方法
+        # 执行日志器原生exception方法，并根据工厂配置控制发不发送钉钉消息
         self.__logger.exception(msg, *args, **kwargs)
+        if not ding_is_send:
+            return
 
         # 计算特征值
         fp_key = cf.calculate_fp([key, str(type(e))])

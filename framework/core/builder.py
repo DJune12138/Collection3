@@ -79,6 +79,8 @@ class Builder(object):
     def downloader_error_callback(self, e, request):
         """
         当下载器抛出异常后，会调用此函数，一般都需要业务建造器继承重写处理异常的逻辑
+        1.注意，重写该方法时，如果要继续请求，需要return（这里不是yield）一个请求对象
+        2.如果不return一个人请求对象，则会结束该条请求
         :param e:(type=Exception) 下载器抛出的异常对象
         :param request:(type=Request) 交给下载器的请求对象
         """
