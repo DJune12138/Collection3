@@ -61,6 +61,7 @@ pk_extra = 'extra'
 pk_st = 'start-time'
 pk_et = 'end-time'
 pk_ea = 'every-async'
+pk_ps = 'pass-something'
 p_parser = {  # 所有传参构成的字典
     pk_main: {  # 主参数
         pk_dt: {
@@ -103,6 +104,10 @@ p_parser = {  # 所有传参构成的字典
         pk_et: {
             pk_simple: 'e',
             pk_help: '结束时间，格式为“%%Y%%m%%d”或“%%Y%%m%%d%%H%%M”。'
+        },
+        pk_ps: {
+            pk_simple: 'p',
+            pk_help: '跳过某些步骤，不同业务不同用法，具体参照业务参数说明。'
         }
     }
 }

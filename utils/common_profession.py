@@ -54,7 +54,7 @@ def send_ding(msg, e, group):
     return result
 
 
-def game_money_dict(platform, game_code, start, end, e_point=False, server=None):
+def game_money_dict(platform, game_code, start, end, e_point=False, server=None, timezone=None):
     """
     构造获取平台储值的字典，用于构造请求
     :param platform:(type=str) 哪个平台，晶绮jq、和悦hy、初心cx
@@ -63,8 +63,17 @@ def game_money_dict(platform, game_code, start, end, e_point=False, server=None)
     :param end:(type=str) 查询时间段的结束时间
     :param e_point:(type=bool) 使用“epoint>0”的条件，默认不使用
     :param server:(type=list,tuple) 指定伺服器，注意里面的元素必须要str类型，默认None不指定
+    :param timezone:(type=str) 是否需要转换时区，如需要转换的时区，格式“本地时区/目标时区”（例：+08:00/+09:00），默认None不转换时区
     :return request_dict:(type=dict) 用于构造内置请求对象所用参数的字典
     """
+
+    # 时区转换问题
+    time_column, timezone_format = 'create_time', '"%s"'
+    if timezone is not None:
+        l_time = timezone.split('/')[0]  # 本地时区
+        t_time = timezone.split('/')[1]  # 目标时区
+        time_column = 'CONVERT_TZ(create_time,"%s","%s") AS create_time' % (l_time, t_time)
+        timezone_format = 'CONVERT_TZ("%s","{}","{}")'.format(t_time, l_time)
 
     # 采集方式
     way = 'db'
@@ -76,7 +85,7 @@ def game_money_dict(platform, game_code, start, end, e_point=False, server=None)
     table = 'stored_value_record'
 
     # 查询字段
-    columns = ['gd_orderid', 'servercode', 'epoint', 'userid', 'create_time',
+    columns = ['gd_orderid', 'servercode', 'epoint', 'userid', time_column,
                'comefrom', 'user_ip']
 
     # 查询条件
@@ -86,8 +95,8 @@ def game_money_dict(platform, game_code, start, end, e_point=False, server=None)
         server = ' AND servercode in (%s)' % ','.join(server_list)
     else:
         server = ''
-    after_table = 'WHERE gamecode="%s" AND (create_time BETWEEN "%s" AND "%s") AND status IN (1,4)%s%s' % (
-        game_code, start, end, e_point, server)
+    after_table = 'WHERE gamecode="%s" AND (create_time BETWEEN %s AND %s) AND status IN (1,4)%s%s' % (
+        game_code, timezone_format % start, timezone_format % end, e_point, server)
 
     # 储值标识
     meta = 'pay'

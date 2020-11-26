@@ -10,6 +10,7 @@ import json
 import datetime
 import base64
 import subprocess
+import pytz
 import services  # 该模块在加载服务前就已经被导入，只能导入总模块，否则所有服务都会是加载前的None
 
 
@@ -248,3 +249,32 @@ def timestamp_format(timestamp, format_='%Y-%m-%d %H:%M:%S', time_type='lt'):
     else:
         raise ValueError('time_type只能为“lt”（本地时间）或“gt”（格林威治时间）！')
     return format_str
+
+
+def change_timezone(dt_str, t_timezone, l_timezone='Asia/Shanghai', time_format='%Y-%m-%d %H:%M:%S'):
+    """
+    把一个时区的时间转去另外一个时区的时间
+    :param dt_str:(type=str) 要转换的时间字符串
+    :param t_timezone:(type=str) 目标时区
+    :param l_timezone:(type=str) 本地时区，默认东八区（Asia/Shanghai）
+    :param time_format:(type=str) 要转换的时间字符串格式，默认“%Y-%m-%d %H:%M:%S”
+    :return t_dt_str:(type=str) 转换的结果，时间字符串格式为“%Y-%m-%d %H:%M:%S”
+    """
+
+    # 本地时区
+    local_tz = pytz.timezone(l_timezone)
+
+    # 目标时区
+    target_tz = pytz.timezone(t_timezone)
+
+    # 将时间转换成datetime元组
+    dt = datetime.datetime.strptime(dt_str, time_format)
+
+    # 将datetime转换成本地时区时间
+    dt = local_tz.localize(dt)
+
+    # 将本地时间转换成目标时区UTC时间
+    t_dt_str = str(dt.astimezone(tz=target_tz))[0:19]
+
+    # 返回结果
+    return t_dt_str

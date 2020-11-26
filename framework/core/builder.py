@@ -4,6 +4,7 @@
 2.解析响应对象，返回数据对象或者新的请求对象
 """
 
+import re
 from framework.object.request import Request
 from framework.object.item import Item
 from framework.error.check_error import CheckUnPass
@@ -33,12 +34,13 @@ class Builder(object):
     # 如果使用通用流程，则不再进入start_requests函数，而进入auto_game_collection函数
     auto_gc = False
 
-    # 如使用通用的游戏数据采集流程（auto_gc为True），则会根据该参数判定是否只获取OSA配置的伺服器的数据，默认False
-    osa_server = False
-
-    # 如使用通用的游戏数据采集流程，以下信息必须继承重写
+    # 如使用通用的游戏数据采集流程，以下参数必须继承重写
     game_code = None  # 游戏代码，建议大写，类型为字符串
     platform = None  # 游戏所属平台，类型为字符串：晶绮（jq）、初心（cx）、和悦（hy）
+
+    # 如使用通用的游戏数据采集流程，以下参数可选继承重写
+    osa_server = False  # 根据该参数判定是否只获取OSA配置的伺服器的数据，默认False
+    timezone = None  # 是否需要转换时区，如需要转换的时区，则填写str，格式“本地时区/目标时区”（例：+08:00/+09:00），默认None不转换时区
 
     def _funny(self, response):
         """
@@ -119,26 +121,42 @@ class Builder(object):
             start, end = cp.time_quantum(dt_format=str_format)  # 开始与结束时间
             start = cf.change_time_format(start, before=str_format, after=str_format,
                                           interval=-3000)  # SDK延迟，开始时间推前50分钟
+            register_time, login_time, timezone_format, interval = 'regdate', 'a.crtime', '"%s"', 0
+            if self.timezone is not None:  # 根据时区转换数据时间
+                l_time = self.timezone.split('/')[0]  # 本地时区
+                t_time = self.timezone.split('/')[1]  # 目标时区
+                register_time = 'CONVERT_TZ(regdate,"%s","%s") AS regdate' % (l_time, t_time)
+                login_time = 'CONVERT_TZ(a.crtime,"%s","%s") AS crtime' % (l_time, t_time)
+                timezone_format = 'CONVERT_TZ("%s","{}","{}")'.format(t_time, l_time)
+                re_timezone = re.match(r'([+,-])(\d+):(\d+)', l_time)
+                symbol, hour, minute = re_timezone.group(1), re_timezone.group(2), re_timezone.group(3)
+                l_second = int('%s%s' % (symbol, (int(hour) * 3600 + int(minute) * 60)))
+                re_timezone = re.match(r'([+,-])(\d+):(\d+)', t_time)
+                symbol, hour, minute = re_timezone.group(1), re_timezone.group(2), re_timezone.group(3)
+                t_second = int('%s%s' % (symbol, (int(hour) * 3600 + int(minute) * 60)))
+                interval = l_second - t_second
             info_list = [
                 # 注册
                 {'way': 'db', 'parse': 'auto_game_parse', 'meta': 'register', 'db_name': db_name,
                  'table': 'oper_game_user',
-                 'columns': ['userid', 'comefrom', 'ipaddr', 'regdate', 'serid'],
-                 'after_table': 'WHERE gamecode="%s" AND (regdate BETWEEN "%s" AND "%s")%s' % (
-                     self.game_code, start, end, register_where)},
+                 'columns': ['userid', 'comefrom', 'ipaddr', register_time, 'serid'],
+                 'after_table': 'WHERE gamecode="%s" AND (regdate BETWEEN %s AND %s)%s' % (
+                     self.game_code, timezone_format % start, timezone_format % end, register_where)},
                 # 登录
                 {'way': 'db', 'parse': 'auto_game_parse', 'meta': 'login', 'db_name': db_name,
                  'table': 'oper_game_login AS a,oper_game_user AS b',
-                 'columns': ['a.userid', 'a.comefrom', 'a.ipaddr', 'a.crtime', 'a.serid'],
+                 'columns': ['a.userid', 'a.comefrom', 'a.ipaddr', login_time, 'a.serid'],
                  'after_table': 'WHERE a.gamecode=b.gamecode AND a.serid=b.serid AND a.userid=b.userid AND '
-                                'b.regdate<="%s" AND a.gamecode="%s" AND (a.indate BETWEEN "%s" AND "%s") AND ('
-                                'a.crtime BETWEEN "%s" AND "%s")%s' % (
-                                    end, self.game_code,
-                                    cf.change_time_format(start, before=str_format, after='%Y-%m-%d'),
-                                    cf.change_time_format(end, before=str_format, after='%Y-%m-%d'), start, end,
-                                    login_where)}
+                                'b.regdate<=%s AND a.gamecode="%s" AND (a.indate BETWEEN "%s" AND "%s") AND ('
+                                'a.crtime BETWEEN %s AND %s)%s' % (
+                                    timezone_format % end, self.game_code,
+                                    cf.change_time_format(start, before=str_format, after='%Y-%m-%d',
+                                                          interval=interval),
+                                    cf.change_time_format(end, before=str_format, after='%Y-%m-%d', interval=interval),
+                                    timezone_format % start, timezone_format % end, login_where)}
             ]
-            pay_info = cp.game_money_dict(self.platform, self.game_code, start, end, server=server)  # 储值
+            pay_info = cp.game_money_dict(self.platform, self.game_code, start, end, server=server,
+                                          timezone=self.timezone)  # 储值
             pay_info['parse'] = 'auto_game_parse'
             info_list.append(pay_info)
             for info in info_list:
