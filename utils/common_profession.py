@@ -282,3 +282,21 @@ def osa_server_dict(platform, game_code):
     request_dict = {'way': way, 'db_name': db_name, 'table': table, 'columns': columns, 'after_table': after_table,
                     'meta': meta}
     return request_dict
+
+
+# TODO 临时使用旧脚本做即时统计，待即时计算优化好后就可以去掉此调用旧脚本的逻辑
+def old_analyse(platform, name):
+    if services.argv.pass_something == 't':  # 传参-pt则跳过该逻辑
+        return None
+    db_mapping = {'jq': 'demon', 'cx': 'egame_om', 'hy': 'egame_slg'}
+    start, end = time_quantum()
+    s, e = services.argv.start_time, services.argv.end_time
+    if s is not None and e is not None and s.endswith('0000') and e.endswith('0000'):
+        shell = '/usr/bin/python NewOperaData.py -b%s -g%s -d%s,%s -rn -py' % (
+            db_mapping[platform], name, start.strftime('%Y%m%d'), end.strftime('%Y%m%d'))
+    else:
+        shell = '/usr/bin/python NewOperaData.py -b%s -g%s -d%s,%s -r%s,%s -py' % (
+            db_mapping[platform], name, start.strftime('%Y%m%d'), end.strftime('%Y%m%d'),
+            start.strftime('%Y%m%d%H%M'), end.strftime('%Y%m%d%H%M'))
+    cf.print_log('执行报表！shell命令：%s' % shell)
+    return {'way': 'shell', 'parse': '_funny', 'cwd': '/data/shell/lib', 'shell': shell, 'check': False}

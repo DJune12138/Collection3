@@ -25,6 +25,7 @@
   -- services                      --> 公共服务
     -- __init__.py                 --> 具体公共服务对象
     -- load.py                     --> 加载公共服务
+  -- temporary                     --> 存放临时文件
   -- utils                         --> 工具包
     -- clickhouse.py               --> ClickHouse数据库连接池
     -- common_function.py          --> 非业务公共函数

@@ -86,7 +86,12 @@ def request_get_response(url, method='get', interval=0, retry_interval=1, timeou
             if method.lower() == 'get':
                 response = requests.get(url, timeout=timeout, headers=kwargs['headers'])
             elif method.lower() == 'post':
-                response = requests.post(url, timeout=timeout, headers=kwargs['headers'], data=kwargs['data'])
+                files = kwargs.get('files')
+                if files is None:
+                    response = requests.post(url, timeout=timeout, headers=kwargs['headers'], data=kwargs['data'])
+                else:
+                    response = requests.post(url, timeout=timeout, headers=kwargs['headers'], data=kwargs['data'],
+                                             files=files)
             else:
                 raise ValueError('method只能为"get"或"post"！')
         except requests.exceptions.RequestException as e:
