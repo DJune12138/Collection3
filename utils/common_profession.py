@@ -223,7 +223,8 @@ def time_quantum(dt_format=None):
     3.只传入结束时间，则开始时间为结束时间的上一个节点
     4.开始时间与结束时间均有传入，则使用传入时间
     :param dt_format:(type=str) 返回格式化时间的格式，默认None则直接返回datetime对象
-    :return:
+    :return start_datetime:(type=datetime,str) 开始时间，根据dt_format返回datetime或str
+    :return end_datetime:(type=datetime,str) 结束时间，同上
     """
 
     # 基础参数

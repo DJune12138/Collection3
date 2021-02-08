@@ -179,7 +179,8 @@ class Builder(object):
         # 获取数据标识与源数据
         key = response.meta
         source_data = response.data
-        cf.print_log('（通用游戏数据采集流程）获取到%s游戏的%s数据，数据长度%s！' % (self.game_code, key, len(source_data)))
+        if key != 'online':
+            cf.print_log('（通用游戏数据采集流程）获取到%s游戏的%s数据，数据长度%s！' % (self.game_code, key, len(source_data)))
 
         # 通用参数
         str_format = '%Y-%m-%d %H:%M:%S'

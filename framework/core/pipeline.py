@@ -7,7 +7,9 @@ from framework.object.request import Request
 from framework.error.check_error import ParameterError
 from services import mysql, redis, clickhouse, logger
 from utils import common_profession as cp
-from utils.mysql import ExecuteError
+from utils import common_function as cf
+from utils.mysql import ExecuteError as mysql_exe
+from utils.clickhouse import ExecuteError as clickhouse_exe
 
 
 class Pipeline(object):
@@ -56,31 +58,32 @@ class Pipeline(object):
                 data['columns'] = ['gamecode', 'servercode', 'online_time', 'online_count']
                 data['values'] = [game_code, server_code, time, source['count']]
             elif detail in ('register', 'login', 'pay'):  # 注册、登录、储值
-                userid = source['userid']
-                puid = source.get('puid') if source.get('puid') else userid
-                ip = source.get('ip', '')
+                user_id = source['userid']
+                p_uid = source.get('puid') if source.get('puid') else user_id
+                ip = source.get('ip')
+                ip = ip if ip is not None else ''  # 未知情况下IP传入时就是为None，防止后续字符串拼接报错，当为None时为空字符串
                 area = cp.ip_belong(ip)['code']
                 area_code = 'TW' if area == '' else area
-                os = 'IOS' if source.get('os', '').lower() == 'ios' else 'Android'
+                os = 'IOS' if 'ios' in source.get('os', '').lower() else 'Android'
                 if detail == 'register':  # 注册
                     data['table'] = 'oper_game_user'
                     data['columns'] = ['gamecode', 'servercode', 'regdate', 'userid', 'puid',
                                        'ip', 'os', 'areacode', 'regtime']
-                    data['values'] = [game_code, server_code, time[:10], userid, puid,
+                    data['values'] = [game_code, server_code, time[:10], user_id, p_uid,
                                       ip, os, area_code, time]
                 elif detail == 'login':  # 登录
                     data['table'] = 'oper_game_login'
                     data['columns'] = ['gamecode', 'servercode', 'logindate', 'userid', 'puid',
                                        'ip', 'os', 'areacode', 'logintime']
-                    data['values'] = [game_code, server_code, time[:10], userid, puid,
+                    data['values'] = [game_code, server_code, time[:10], user_id, p_uid,
                                       ip, os, area_code, time]
                 elif detail == 'pay':  # 储值
                     data['table'] = 'oper_game_pay'
                     data['columns'] = ['gamecode', 'orderid', 'servercode', 'paydate', 'userid',
                                        'puid', 'ip', 'os', 'areacode', 'paytime',
                                        'amt']
-                    data['values'] = [game_code, source['order_id'], server_code, time[:10], userid,
-                                      puid, ip, os, area_code, time,
+                    data['values'] = [game_code, source['order_id'], server_code, time[:10], user_id,
+                                      p_uid, ip, os, area_code, time,
                                       source['amt']]
         if data is not None:
             self.into_db(data)
@@ -117,9 +120,10 @@ class Pipeline(object):
             mysql_db = mysql[db_name]
             try:
                 mysql_db.insert(**data)
-            except ExecuteError as e:
-                if 'Lock wait timeout exceeded' in str(e):  # 多线程引发的唯一键冲突，有一定概率发生，暂没有好办法避免，目前先不用发钉钉
-                    logger.exception('多线程下概率引发的唯一键冲突！')
+            except mysql_exe as e:
+                if 'Lock wait timeout exceeded' in str(e):  # 多线程引发的唯一键冲突，有一定概率发生，暂没有好办法避免
+                    cf.print_log('多线程下概率引发的唯一键冲突！')
+                    print(e)
                 else:
                     raise e
         elif db_type == 'redis':
@@ -127,6 +131,13 @@ class Pipeline(object):
             getattr(redis_db, data.get('redis_set', 'set'))(**data)
         elif db_type == 'clickhouse':
             clickhouse_db = clickhouse[db_name]
-            clickhouse_db.insert(**data)
+            try:
+                clickhouse_db.insert(**data)
+            except clickhouse_exe as e:
+                if 'most likely due to a circular import' in str(e):  # clickhouse_driver源代码未知错误，暂无法解决
+                    cf.print_log('clickhouse_driver源代码未知错误！')  # 预估问题和clickhouse的ReplacingMergeTree引擎有关
+                    print(e)
+                else:
+                    raise e
         else:
             raise ParameterError('db_type', ['mysql', 'redis', 'clickhouse'])

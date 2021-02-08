@@ -86,11 +86,11 @@ class ClickHouse(object):
     # 互斥锁，防止同特征值的连接在异步任务的情况下通过去重验证
     __lock = Lock()
 
-    def __init__(self, connections_min=10, connections_max=20, **kwargs):
+    def __init__(self, connections_min=10, connections_max=100, **kwargs):
         """
         初始配置
         :param connections_min:(type=int) 连接池保持的最小连接数，默认10
-        :param connections_max:(type=int) 连接池允许的最大连接数，默认20
+        :param connections_max:(type=int) 连接池允许的最大连接数，默认100；源代码默认20，由于有未知错误，把阈值设大规避问题
         :param kwargs:(type=dict) 其余的关键字参数，用于接收数据库连接信息，如host、port等
         """
 
