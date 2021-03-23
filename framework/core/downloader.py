@@ -6,7 +6,7 @@
 from threading import Lock
 from time import sleep
 from framework.object.response import Response
-from framework.error.check_error import ParameterError, LackParameter
+from framework.error.check_error import ParameterError, LackParameter, CheckUnPass
 from utils import common_function as cf
 from services import mysql, redis, clickhouse
 
@@ -109,6 +109,31 @@ class Downloader(object):
         result = cf.shell_run(**kwargs)
         return result
 
+    @staticmethod
+    def __file(kwargs):
+        """
+        获取日志文件数据
+        :param kwargs:(type=dict) 下载信息
+        :return result:(type=list) 日志文件数据
+        """
+
+        # 获取传参数据
+        file_name = kwargs.get('file_name')  # 文件名/路径
+        if file_name is None:
+            raise LackParameter(['file_name'])
+        encoding = kwargs.get('encoding')  # 读取编码
+        lines = int(kwargs.get('lines', 1))  # 从文件第几行开始返回数据，第一行意味全量返回
+        if lines < 1:
+            raise CheckUnPass('文件行数lines不能小于1！')
+
+        # 读取文件，获取数据
+        with open(file_name, encoding=encoding) as f:
+            result = f.readlines()
+
+        # 根据传参行数返回数据
+        result = result[lines - 1:]  # Tips：py索引从0开始，文件行数对应减1
+        return result
+
     def get_response(self, request):
         """
         发起请求获取响应
@@ -125,10 +150,13 @@ class Downloader(object):
             data = self.__db(kwargs)
         elif way == 'shell':
             data = self.__shell(kwargs)
+        elif way == 'file':
+            data = self.__file(kwargs)
         elif way == 'test':
             data = kwargs.get('test_data')
         else:
-            raise ParameterError('way', ['“web”（获取网络数据）', '“db”（获取数据库数据）', '“shell”（执行shell命令并获取返回数据）'])
+            raise ParameterError('way', ['“web”（获取网络数据）', '“db”（获取数据库数据）', '“shell”（执行shell命令并获取返回数据）',
+                                         '“file”（获取日志文件数据）'])
 
         # 2.构建响应对象，并返回
         response = Response(data)

@@ -7,8 +7,10 @@ import json
 from datetime import datetime
 from geoip2 import database as geoip2_db, errors as geoip2_e
 import services  # 该模块在加载服务前就已经被导入，只能导入总模块，否则所有服务都会是加载前的None
-from config import ding_token, factory_config, factory_code, pegging_redis, geoip2_path, pk_st, pk_et, gc_interval
+from config import ding_token, factory_config, factory_code, pegging_redis, geoip2_path, pk_st, pk_et, gc_interval, \
+    format_date, format_datetime
 from utils import common_function as cf
+from framework.error.check_error import CheckUnPass
 
 
 def send_ding(msg, e, group):
@@ -215,39 +217,45 @@ def ip_belong(ip, redis='127_0'):
     return result
 
 
-def time_quantum(dt_format=None):
+def time_quantum(dt_format=None, is_date=False):
     """
     根据脚本传参，返回开始与结束时间，所有时间均自动转化为整十分
     1.开始时间与结束时间均没有传入，则结束时间为当前时间，开始时间为上一个节点
     2.只传入开始时间，则结束时间为开始时间的下一个节点
     3.只传入结束时间，则开始时间为结束时间的上一个节点
     4.开始时间与结束时间均有传入，则使用传入时间
+    5.若is_date为True，则不为以上规则，规则只有一条，就是开始和结束都默认为当天零点
     :param dt_format:(type=str) 返回格式化时间的格式，默认None则直接返回datetime对象
+    :param is_date:(type=bool) 是否以日为单位，即使用第五点规则，默认False不使用
     :return start_datetime:(type=datetime,str) 开始时间，根据dt_format返回datetime或str
     :return end_datetime:(type=datetime,str) 结束时间，同上
     """
 
     # 基础参数
-    format_ = '%Y%m%d%H%M'
     now_datetime = services.launch['datetime']
-    start_time = getattr(services.argv, pk_st.replace('-', '_'))
-    end_time = getattr(services.argv, pk_et.replace('-', '_'))
+    argv = get_argv((pk_st, pk_et))
+    start_time, end_time = argv[pk_st], argv[pk_et]
 
     # 根据规则转化时间
-    if start_time is None and end_time is None:
-        end_datetime = datetime.strptime(now_datetime.strftime(format_)[:-1] + '0', format_)
-        start_datetime = cf.datetime_timedelta('minutes', 0 - gc_interval, date_time=end_datetime)
-    elif start_time is not None and end_time is None:
-        start_datetime = datetime.strptime(start_time[:-1] + '0', format_)
-        end_datetime = cf.datetime_timedelta('minutes', gc_interval, date_time=start_datetime)
-    elif start_time is None and end_time is not None:
-        end_datetime = datetime.strptime(end_time[:-1] + '0', format_)
-        start_datetime = cf.datetime_timedelta('minutes', 0 - gc_interval, date_time=end_datetime)
+    if not is_date:
+        if start_time is None and end_time is None:
+            end_datetime = datetime.strptime(now_datetime.strftime(format_datetime)[:-1] + '0', format_datetime)
+            start_datetime = cf.datetime_timedelta('minutes', 0 - gc_interval, date_time=end_datetime)
+        elif start_time is not None and end_time is None:
+            start_datetime = datetime.strptime(start_time[:-1] + '0', format_datetime)
+            end_datetime = cf.datetime_timedelta('minutes', gc_interval, date_time=start_datetime)
+        elif start_time is None and end_time is not None:
+            end_datetime = datetime.strptime(end_time[:-1] + '0', format_datetime)
+            start_datetime = cf.datetime_timedelta('minutes', 0 - gc_interval, date_time=end_datetime)
+        else:
+            start_datetime = datetime.strptime(start_time[:-1] + '0', format_datetime)
+            end_datetime = datetime.strptime(end_time[:-1] + '0', format_datetime)
     else:
-        start_datetime = datetime.strptime(start_time[:-1] + '0', format_)
-        end_datetime = datetime.strptime(end_time[:-1] + '0', format_)
+        default_date = datetime.strptime(now_datetime.strftime(format_date), format_date)
+        start_datetime = default_date if start_time is None else datetime.strptime(start_time, format_date)
+        end_datetime = default_date if end_time is None else datetime.strptime(end_time, format_date)
 
-    # 返回结束
+    # 返回结果
     if dt_format is not None:
         start_datetime, end_datetime = start_datetime.strftime(dt_format), end_datetime.strftime(dt_format)
     return start_datetime, end_datetime
@@ -301,3 +309,21 @@ def old_analyse(platform, name):
             start.strftime('%Y%m%d%H%M'), end.strftime('%Y%m%d%H%M'))
     cf.print_log('执行报表！shell命令：%s' % shell)
     return {'way': 'shell', 'parse': '_funny', 'cwd': '/data/shell/lib', 'shell': shell, 'check': False}
+
+
+def get_argv(argv_key):
+    """
+    获取脚本传参
+    :param argv_key:(type=str,list,tuple) 参数key，单个可直接传str，多个就传list或tuple（元素应为str）
+    :return result:(type=dict) 传参结果，dict的key为参数key，dict的value为传参（str或None，None则没有对应传参）
+    """
+
+    result = dict()
+    if isinstance(argv_key, str):
+        result[argv_key] = getattr(services.argv, argv_key.replace('-', '_'))
+    elif isinstance(argv_key, list) or isinstance(argv_key, tuple):
+        for one_key in argv_key:
+            result[one_key] = getattr(services.argv, one_key.replace('-', '_'))
+    else:
+        raise CheckUnPass('“argv_key”只能为str类型（单个）或list、tuple类型（多个）！')
+    return result

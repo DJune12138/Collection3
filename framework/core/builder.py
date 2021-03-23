@@ -106,6 +106,9 @@ class Builder(object):
 
         # 注册、登录、储值
         if not self.osa_server or response is not None:
+            str_format = '%Y-%m-%d %H:%M:%S'
+            start, end = cp.time_quantum(dt_format=str_format)  # 开始与结束时间
+            cf.print_log('（通用游戏数据采集流程）%s 执行 %s ~ %s' % (self.game_code, start, end))
             server_data = response.data
             server, register_where, login_where = None, '', ''
             if self.osa_server and len(server_data):
@@ -117,8 +120,6 @@ class Builder(object):
                 register_where = ' AND serid in (%s)' % ','.join(str_server)
                 login_where = ' AND a.serid in (%s)' % ','.join(str_server)
             db_name = '%s_sdk' % self.platform  # 查询数据库
-            str_format = '%Y-%m-%d %H:%M:%S'
-            start, end = cp.time_quantum(dt_format=str_format)  # 开始与结束时间
             start = cf.change_time_format(start, before=str_format, after=str_format,
                                           interval=-3000)  # SDK延迟，开始时间推前50分钟
             register_time, login_time, timezone_format, interval = 'regdate', 'a.crtime', '"%s"', 0

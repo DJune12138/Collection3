@@ -21,7 +21,7 @@ from framework.object.item import Item
 from framework.middlewares.builder_middlewares import BuilderMiddleware
 from framework.middlewares.downloader_middlewares import DownloaderMiddleware
 from framework.error.check_error import *
-from utils import common_function as cf
+from utils import common_function as cf, common_profession as cp
 from config import *
 from services import logger, argv
 
@@ -469,7 +469,7 @@ class Engine(object):
             if not isinstance(F_every_async, int) or F_every_async < 1:
                 raise CheckUnPass('配置config中的并发倍数F_every_async不为int类型或小于1，请修改！')
             self.__pool = Pool(F_max_async)
-        argv_ea = getattr(argv, pk_ea.replace('-', '_'))
+        argv_ea = cp.get_argv(pk_ea)[pk_ea]
         if argv_ea is not None:
             try:
                 argv_ea = int(argv_ea)

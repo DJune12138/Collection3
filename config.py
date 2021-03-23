@@ -62,6 +62,7 @@ pk_st = 'start-time'
 pk_et = 'end-time'
 pk_ea = 'every-async'
 pk_ps = 'pass-something'
+pk_jd = 'just-do'
 p_parser = {  # 所有传参构成的字典
     pk_main: {  # 主参数
         pk_dt: {
@@ -108,6 +109,10 @@ p_parser = {  # 所有传参构成的字典
         pk_ps: {
             pk_simple: 'p',
             pk_help: '跳过某些步骤，不同业务不同用法，具体参照业务参数说明。'
+        },
+        pk_jd: {
+            pk_simple: 'j',
+            pk_help: '只做某些步骤，不同业务不同用法，具体参照业务参数说明。'
         }
     }
 }
@@ -142,3 +147,7 @@ pegging_redis = '127_8'
 
 # geoip2驱动路径
 geoip2_path = factory_config[factory_code]['geoip2_path']
+
+# 日期格式
+format_date = '%Y%m%d'
+format_datetime = '%Y%m%d%H%M'
