@@ -13,12 +13,12 @@ from utils import common_function as cf
 from framework.error.check_error import CheckUnPass
 
 
-def send_ding(msg, e, group):
+def send_ding(msg, group, e=None):
     """
     发送钉钉消息
     :param msg:(type=str) 要发送的钉钉信息内容
-    :param e:(type=Exception) 报错对象
     :param group:(type=str) 要发送的钉钉群组
+    :param e:(type=Exception) 报错对象，默认None则不使用报错模板
     :return result:(type=bool) 发送结果，成功为True，失败为False
     """
 
@@ -28,10 +28,13 @@ def send_ding(msg, e, group):
         raise ValueError('group只能为%s其中一个！' % '、'.join(group_list))
 
     # 钉钉消息内容
-    log_path = factory_config[factory_code]['logger_config.log_path']
-    log_path = log_path if log_path is not None else os.path.join(os.getcwd(), 'log')
-    ding_msg = '任务出错了！详情请查看报错日志！\n执行任务的主机IP：%s\n报错日志路径：%s\nMsg：%s\nError：%s' \
-               % (services.launch['ip'], log_path, msg, str(e))
+    if e is not None:
+        log_path = factory_config[factory_code]['logger_config.log_path']
+        log_path = log_path if log_path is not None else os.path.join(os.getcwd(), 'log')
+        ding_msg = '任务出错了！详情请查看报错日志！\n执行任务的主机IP：%s\n报错日志路径：%s\nMsg：%s\nError：%s' \
+                   % (services.launch['ip'], log_path, msg, str(e))
+    else:
+        ding_msg = msg
 
     # 发送钉钉消息
     url = 'https://oapi.dingtalk.com/robot/send?access_token=%s' % ding_token[group]

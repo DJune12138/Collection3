@@ -1,5 +1,5 @@
 .idea/
 *.py[cod]
 *log/
-play.py
+play*.py
 account/*.json

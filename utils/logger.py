@@ -161,7 +161,7 @@ class Logger(object):
 
                 # Redis信息已过期（不存在），发送钉钉
                 if redis_result is None:
-                    ding_result = cp.send_ding(msg, e, group)
+                    ding_result = cp.send_ding(msg, group, e=e)
 
                     # 重设Redis消息
                     if ding_result:

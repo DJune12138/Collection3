@@ -59,6 +59,7 @@ class Engine(object):
             self.total_request_nums = 0
             self.total_response_nums = 0
             self.total_error_nums = 0
+            self.last_finish = 0  # 用于记录上一次引擎循环完成了几个任务
 
             # 异步任务相关
             self.__while_run = True  # 引擎是否继续循环启动的标志
@@ -328,6 +329,7 @@ class Engine(object):
                     else:  # 其余走正常流程
                         start_list = self.__check_return(self.__check_argument(getattr(builder, request_type)))
                 except AttributeError:
+                    self.__add_request(Request('test', parse='_funny'), builder_name)  # 彩蛋请求让引擎有机会关闭
                     continue
                 else:
                     no_task = False
@@ -492,13 +494,15 @@ class Engine(object):
             self.__pool.apply_async(self.__execute_request_response_item, callback=self.__call_back,
                                     error_callback=self.__error_callback)
 
-        # 控制判断引擎关闭时机
+        # 控制判断引擎关闭时机，由于是异步任务，需要符合特定条件才判断，否则引擎会过快关闭
+        # 由于引擎会循环启动，需要请求数大于上一次循环结束（初始值为0）才开始判定
+        # 并且完成请求数要大于等于发起请求数，才能关闭引擎
         while True:
             time.sleep(0.001)  # 防止CPU空转
-            if self.total_response_nums != 0:  # 由于异步任务，因此要响应不为0才开始判断
-                if self.total_response_nums >= self.total_request_nums:
-                    self.__is_running = False  # 标记引擎关闭
-                    break
+            if self.last_finish < self.total_request_nums <= self.total_response_nums:
+                self.__is_running = False  # 标记引擎关闭
+                self.last_finish = self.total_request_nums  # 记录该次引擎请求数
+                break
 
     def start(self):
         """

@@ -207,13 +207,15 @@ class Builder(object):
                 os = one_data['comefrom']
                 time = one_data['regdate'].strftime(str_format) if key == 'register' else one_data['crtime'].strftime(
                     str_format)
+                dup_column = 'regtime' if key == 'register' else 'logintime'
                 data = {
                     'platform': self.platform,
                     'source': {'gamecode': self.game_code, 'servercode': server_code, 'userid': user_id, 'ip': ip,
-                               'os': os, 'time': time}
+                               'os': os, 'time': time, 'duplicates': [dup_column], 'dup_ac': True}
                 }
                 yield self.item(data, detail=key)
                 if key == 'register':  # 注册还需要同时录入一条登录
+                    data['source']['duplicates'] = ['logintime']
                     yield self.item(data, detail='login')
 
         # 储值

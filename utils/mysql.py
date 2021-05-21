@@ -242,7 +242,8 @@ class MySQL(object):
         result = self.execute(sql, fetchall=fetchall)
         return result
 
-    def insert(self, table, values, columns=None, duplicates=None, ignore=False, **kwargs):
+    def insert(self, table, values, columns=None, duplicates=None, ignore=False, dup_ac=False, limit_line=None,
+               **kwargs):
         """
         拼接常规INSERT语句并执行
         :param table:(type=str) 要插入数据的表名
@@ -250,6 +251,8 @@ class MySQL(object):
         :param columns:(type=list) 需要插入数据的字段，默认所有字段，["column1", "column2", "column3", ...]
         :param duplicates:(type=list) 唯一键冲突则更新，["column1", "column2", "column3", ...]
         :param ignore:(type=bool) 唯一键冲突则忽略，默认False；如果duplicates不为None，则ignore强制为False
+        :param dup_ac:(type=bool) 适配自动采集流程用，会判断更新冲突数据，duplicates不为None才有效，默认False不启用
+        :param limit_line:(type=int) 在插入多条数据时可启用，避免一次插入过多数据，每次分批插入几条，默认None则不启用
         :param kwargs:(type=dict) 额外的关键字参数，主要用于防止传入过多参数报错
         :return result:(type=int) 执行结果，受影响行数
         """
@@ -258,33 +261,50 @@ class MySQL(object):
         if columns is not None:
             if not isinstance(columns, list):
                 raise MySQLError('columns参数类型应该为list！')
-            columns = '(%s)' % ','.join(columns)
+            columns_sql = '(%s)' % ','.join(columns)
         else:
-            columns = ''
+            columns_sql = ''
 
         # 校验values
+        values_len = len(values)
         if not isinstance(values, list):
             raise MySQLError('values参数类型应该为list！')
-        if len(values) == 0:
+        if values_len == 0:
             cf.print_log('values为空！跳过本次插入MySQL！')
             return
 
         # 拼接插入值
         if isinstance(values[0], list):  # 插入多条数据
-            values = ','.join(['(%s)' % ','.join(['"%s"' % self.__replace_value(value) for value in one_data])
-                               for one_data in values])
+            if limit_line is None:  # 不分批插入
+                values_sql = ','.join(['(%s)' % ','.join(['"%s"' % self.__replace_value(value) for value in one_data])
+                                       for one_data in values])
+            else:  # 分批插入
+                values_sql = ','.join(['(%s)' % ','.join(['"%s"' % self.__replace_value(value) for value in one_data])
+                                       for one_data in values[:limit_line]])
+                for i in range(int(values_len / limit_line if not values_len % limit_line
+                                   else values_len / limit_line + 1)):
+                    if i == 0:
+                        continue  # 第一批直接交由本次函数插入
+                    self.insert(table, values[i * limit_line: (i + 1) * limit_line], columns=columns,
+                                duplicates=duplicates, ignore=ignore, dup_ac=dup_ac)  # 后续多次调用insert方法实现分批插入
         else:  # 插入单条数据
-            values = '(%s)' % ','.join(['"%s"' % self.__replace_value(value) for value in values])
+            values_sql = '(%s)' % ','.join(['"%s"' % self.__replace_value(value) for value in values])
 
         # 拼接“唯一键冲突则更新”
         if duplicates is not None:
             if not isinstance(duplicates, list):
                 raise MySQLError('duplicates参数类型应该为list！')
-            duplicates = 'ON DUPLICATE KEY UPDATE %s' % ','.join(['%s=VALUES(%s)' % (
-                duplicate, duplicate) for duplicate in duplicates])
+            if dup_ac:
+                duplicates_sql = 'ON DUPLICATE KEY UPDATE %s' % ','.join(
+                    ['%s=IF(%s>VALUES(%s) AND %s=DATE_FORMAT(VALUES(%s),"%%Y-%%m-%%d"),VALUES(%s),%s)' % (
+                        duplicate, duplicate, duplicate, duplicate.replace('time', 'date'), duplicate, duplicate,
+                        duplicate) for duplicate in duplicates])
+            else:
+                duplicates_sql = 'ON DUPLICATE KEY UPDATE %s' % ','.join(
+                    ['%s=VALUES(%s)' % (duplicate, duplicate) for duplicate in duplicates])
             ignore = False  # ignore强制为False
         else:
-            duplicates = ''
+            duplicates_sql = ''
 
         # 拼接“唯一键冲突则忽略”
         ignore = ' IGNORE ' if ignore else ' '
@@ -295,9 +315,9 @@ class MySQL(object):
         VALUES %s
         %s;""" \
               % (ignore, table,
-                 columns,
-                 values,
-                 duplicates)
+                 columns_sql,
+                 values_sql,
+                 duplicates_sql)
 
         # 执行并返回受影响行数
         result = self.execute(sql)

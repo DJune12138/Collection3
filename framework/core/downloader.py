@@ -127,7 +127,7 @@ class Downloader(object):
             raise CheckUnPass('文件行数lines不能小于1！')
 
         # 读取文件，获取数据
-        with open(file_name, encoding=encoding) as f:
+        with open(file_name, encoding=encoding, errors='ignore') as f:
             result = f.readlines()
 
         # 根据传参行数返回数据

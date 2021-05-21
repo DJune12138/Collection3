@@ -51,6 +51,8 @@ class Pipeline(object):
             duplicates = source.get('duplicates')
             if duplicates:
                 data['duplicates'] = duplicates
+                if source.get('dup_ac'):
+                    data['dup_ac'] = True
             else:
                 data['ignore'] = True
             if detail == 'online':  # 在线
@@ -123,7 +125,6 @@ class Pipeline(object):
             except mysql_exe as e:
                 if 'Lock wait timeout exceeded' in str(e):  # 多线程引发的唯一键冲突，有一定概率发生，暂没有好办法避免
                     cf.print_log('多线程下概率引发的唯一键冲突！')
-                    print(e)
                 else:
                     raise e
         elif db_type == 'redis':
@@ -136,7 +137,6 @@ class Pipeline(object):
             except clickhouse_exe as e:
                 if 'most likely due to a circular import' in str(e):  # clickhouse_driver源代码未知错误，暂无法解决
                     cf.print_log('clickhouse_driver源代码未知错误！')  # 预估问题和clickhouse的ReplacingMergeTree引擎有关
-                    print(e)
                 else:
                     raise e
         else:
