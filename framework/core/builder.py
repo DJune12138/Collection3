@@ -42,6 +42,30 @@ class Builder(object):
     osa_server = False  # 根据该参数判定是否只获取OSA配置的伺服器的数据，默认False
     timezone = None  # 是否需要转换时区，如需要转换的时区，则填写str，格式“本地时区/目标时区”（例：+08:00/+09:00），默认None不转换时区
 
+    # 是否自动生成游戏数据采集流程的旧报表
+    # 目前旧报表需要调用旧的Python2脚本生成
+    # 继承后可重写该属性，True为自动生成，False为不自动生成，默认False
+    old_report = False
+
+    def __new__(cls, *args, **kwargs):
+        """
+        判断是否需要自动生成游戏数据采集流程的旧报表，继承后不建议重写
+        """
+
+        if cls.old_report:
+            setattr(cls, 'end_requests_1', cls.__def_old_report)
+        return object.__new__(cls)
+
+    def __def_old_report(self):
+        """
+        游戏数据采集流程生成旧报表，这个函数不用于继承重写
+        """
+
+        info = cp.old_analyse(self.platform, self.game_code)
+        if info is None:
+            return
+        yield self.request(**info)
+
     def _funny(self, response):
         """
         彩蛋流程专用，这个函数一般只用于彩蛋，不用于继承重写或参与业务
