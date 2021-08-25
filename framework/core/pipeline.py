@@ -67,12 +67,15 @@ class Pipeline(object):
                 area = cp.ip_belong(ip)['code']
                 area_code = 'TW' if area == '' else area
                 source_os = source.get('os', '')
-                if 'ios' in source_os.lower():
-                    os = 'IOS'
-                elif 'android' in source_os.lower() or not source_os:
-                    os = 'Android'
+                if detail == 'pay':
+                    os = 'IOS' if 'ios' in source_os.lower() else 'Android'
                 else:
-                    os = source_os
+                    if 'ios' in source_os.lower():
+                        os = 'IOS'
+                    elif 'android' in source_os.lower() or not source_os:
+                        os = 'Android'
+                    else:
+                        os = source_os
                 if detail == 'register':  # 注册
                     data['table'] = 'oper_game_user'
                     data['columns'] = ['gamecode', 'servercode', 'regdate', 'userid', 'puid',
