@@ -5,11 +5,12 @@
 """
 
 import re
+from datetime import datetime
 from framework.object.request import Request
 from framework.object.item import Item
 from framework.error.check_error import CheckUnPass
 from utils import common_profession as cp, common_function as cf
-from services import launch
+from services import launch, redis
 
 
 class Builder(object):
@@ -277,6 +278,86 @@ class Builder(object):
 
         item = self.item(None)
         yield item
+
+    def af_spend(self, response):
+        """
+        OSA上AF行销看板各类媒体实际花费数据处理入库
+        1.发起该请求时，meta属性带上平台，data属性带上数据，而data的数据为一个dict并有如下key：
+            ① game_code：游戏代码
+            ② media：媒体名
+            ③ osa_name：②的媒体名在osa的别称
+            ④ device：设备，android、ios等
+            ⑤ country：国家或地区代码，TW、KR、JP等
+            ⑥ time：日期，兼容datetime类型
+            ⑦ spend：花费数据
+        2.由于af_spend中的字段item需要映射配置获取国家名称，因此此方法有两个去向：
+            ① 先获取redis有没有缓存，如有缓存则可以直接分析入库
+            ② 如没有缓存，则先分析，再发起“country_code_name”请求，再入库
+        :param response:(type=Response) 引擎回传的响应对象
+        :return item:(type=Item,Request) 内置数据、请求对象
+        """
+
+        # 获取传输数据
+        platform = response.meta
+        source_data = response.data
+
+        # 分析数据
+        item_data = {'db_name': 'osa_%s' % platform, 'table': 'af_spend', 'values': None,
+                     'columns': ['gamecode', 'media', 'osa_name', 'device', 'country', 'time', 'item', 'spend'],
+                     'duplicates': ['spend']}
+        device = source_data['device'].lower()
+        if device == 'android':
+            device_name = '安卓'
+        elif device == 'ios':
+            device_name = 'IOS'
+        else:
+            device_name = 'other'
+        country = source_data['country'].upper()
+        country = 'OTHER' if not country or country in ('NONE', 'UNKNOWN') else country
+        country_name = '其他' if country == 'OTHER' else redis['127_0'].get('%s_country_name' % country)
+        time = source_data['time']
+        if isinstance(time, datetime):
+            time = time.strftime('%Y-%m-%d')
+        values = [source_data['game_code'], source_data['media'], source_data['osa_name'], device,
+                  country, time, '%s-' % device_name, source_data['spend']]
+        item_data['values'] = values
+
+        # 有地区名称缓存则直接入库
+        if country_name is not None:
+            values[6] += country_name
+            yield self.item(item_data)
+
+        # 没有则发起查询地区的请求
+        else:
+            yield self.request('db', parse='af_spend_country', meta=item_data, db_name='osa_jq', table='area_code_list',
+                               after_table='WHERE countrycode="%s"' % country, fetchall=False)
+
+    def af_spend_country(self, response):
+        """
+        获取af_spend里item字段所需的国家地区明，再入库数据
+        :param response:(type=Response) 引擎回传的响应对象
+        :return item:(type=Item,Request) 内置数据、请求对象
+        """
+
+        # 提取数据
+        into_db_data = response.meta
+        country_data = response.data
+        if country_data:
+            country = country_data['countrycode'].upper()
+            country_name = country_data['countryname']
+        else:
+            country = into_db_data['values'][4]
+            country_name = country
+
+        # 添加缓存
+        # 一般来说地区名字不会变且齐全，但如果太皮。。还是加个7天的过期时间吧
+        item_data = {'db_type': 'redis', 'db_name': '127_0', 'key': '%s_country_name' % country, 'value': country_name,
+                     'ex': 604800}
+        yield self.item(item_data)
+
+        # 修正item，入库
+        into_db_data['values'][6] += country_name
+        yield self.item(into_db_data)
 
     @staticmethod
     def request(*args, **kwargs):
