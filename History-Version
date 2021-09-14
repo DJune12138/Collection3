@@ -322,3 +322,13 @@ V1.9.2
 简述：新增入库行销数据af_spend的流程。
 新增：
     1.建造器添加af_spend与af_spend_country两个方法，用于分析入库行销数据af_spend
+
+
+
+V1.9.3
+发布日期：2021-09-14
+简述：增强从web方法获取数据的功能性。
+修复（改）：
+    1.下载器的web方法，is_json参数废弃，改成web_type参数，通过该参数控制返回web数据的类型
+新增：
+    1.现在下载器web方法可以通过web_type参数传入“xpath”解析成Element对象了

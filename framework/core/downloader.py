@@ -5,6 +5,7 @@
 
 from threading import Lock
 from time import sleep
+from lxml import etree
 from framework.object.response import Response
 from framework.error.check_error import ParameterError, LackParameter, CheckUnPass
 from utils import common_function as cf
@@ -58,8 +59,16 @@ class Downloader(object):
                     sleep(limit_s)
 
         # 发起请求，返回响应
-        # 根据json参数确定是返回原生响应对象还是响应体解析json后的数据
-        response = cf.repetition_json(**kwargs) if kwargs.get('is_json', True) else cf.request_get_response(**kwargs)
+        # 根据web_type参数决定返回什么类型的数据：json返回json字符串（默认），response返回原生响应对象，xpath返回Element对象
+        web_type = kwargs.get('web_type', 'json')
+        if web_type == 'json':
+            response = cf.repetition_json(**kwargs)
+        elif web_type == 'response':
+            response = cf.request_get_response(**kwargs)
+        elif web_type == 'xpath':
+            response = etree.HTML(cf.request_get_response(**kwargs).text)
+        else:
+            raise ParameterError('web_type', ['“json”（解析为json字符串）', '“response”（返回原生响应对象）', '“xpath”（解析为Element对象）'])
         return response
 
     @staticmethod
