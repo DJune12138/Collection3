@@ -142,6 +142,8 @@ def u_pegging(platform, uid_list, type_list):
             user_id = str(one_data['userid'])
             for type_ in type_list:
                 data = one_data[column_map[type_]]
+                if type_ == 'os':
+                    data = 'IOS' if 'ios' in data.lower() else 'Android'  # os暂时只分为安卓与苹果
                 p_data.setdefault(user_id, dict())[type_] = data
                 redis.set('%s-%s' % (user_id, type_), data, redis_ex)
 
