@@ -11,6 +11,7 @@ from framework.object.item import Item
 from framework.error.check_error import CheckUnPass
 from utils import common_profession as cp, common_function as cf
 from services import launch, redis
+from config import format_date_n, format_datetime_n
 
 
 class Builder(object):
@@ -42,11 +43,9 @@ class Builder(object):
     # 如使用通用的游戏数据采集流程，以下参数可选继承重写
     osa_server = False  # 根据该参数判定是否只获取OSA配置的伺服器的数据，默认False
     timezone = None  # 是否需要转换时区，如需要转换的时区，则填写str，格式“本地时区/目标时区”（例：+08:00/+09:00），默认None不转换时区
-
-    # 是否自动生成游戏数据采集流程的旧报表
-    # 目前旧报表需要调用旧的Python2脚本生成
-    # 继承后可重写该属性，True为自动生成，False为不自动生成，默认False
-    old_report = False
+    old_report = False  # 是否自动生成游戏数据采集流程的旧报表
+    pegging_field = None  # 反查ip或os，例：{"register": ["ip"], "login": ["ip", "os"]}
+    auto_pass = None  # 跳过自动采集register、login或pay以供后续个性化定制，例：["register"]、["register", "login", "pay"]
 
     def __new__(cls, *args, **kwargs):
         """
@@ -66,6 +65,30 @@ class Builder(object):
         if info is None:
             return
         yield self.request(**info)
+
+    def __pegging_data(self, key, user_id, ip, os):
+        """
+        反查ip或os的逻辑，这个函数不用于继承重写
+        :param key:(type=str) 数据类型，register、login、pay
+        :param user_id:(type=str) 要反查的账户id
+        :param ip:(type=str,None) 原始获取的ip
+        :param os:(type=str,None) 原始获取的os
+        :return ip:(type=str,None) 符合条件后反查的ip，不符合则原始ip
+        :return os:(type=str,None) 符合条件后反查的os，不符合则原始os
+        """
+
+        # 启用转换
+        if self.pegging_field is not None:
+            pegging_value = self.pegging_field.get(key)
+
+            # 配置了key的才转
+            if pegging_value is not None:
+                pegging_result = cp.u_pegging(self.platform, [user_id], pegging_value)
+                ip = pegging_result.get(user_id, dict()).get('ip', ip)
+                os = pegging_result.get(user_id, dict()).get('os', os)
+
+        # 返回结果
+        return ip, os
 
     def _funny(self, response):
         """
@@ -131,8 +154,7 @@ class Builder(object):
 
         # 注册、登录、储值
         if not self.osa_server or response is not None:
-            str_format = '%Y-%m-%d %H:%M:%S'
-            start, end = cp.time_quantum(dt_format=str_format)  # 开始与结束时间
+            start, end = cp.time_quantum(dt_format=format_datetime_n)  # 开始与结束时间
             cf.print_log('（通用游戏数据采集流程）%s 执行 %s ~ %s' % (self.game_code, start, end))
             server_data = response.data
             server, register_where, login_where = None, '', ''
@@ -145,7 +167,7 @@ class Builder(object):
                 register_where = ' AND serid in (%s)' % ','.join(str_server)
                 login_where = ' AND a.serid in (%s)' % ','.join(str_server)
             db_name = '%s_sdk' % self.platform  # 查询数据库
-            start = cf.change_time_format(start, before=str_format, after=str_format,
+            start = cf.change_time_format(start, before=format_datetime_n, after=format_datetime_n,
                                           interval=-3000)  # SDK延迟，开始时间推前50分钟
             register_time, login_time, timezone_format, interval = 'regdate', 'a.crtime', '"%s"', 0
             if self.timezone is not None:  # 根据时区转换数据时间
@@ -176,9 +198,10 @@ class Builder(object):
                                 'b.regdate<=%s AND a.gamecode="%s" AND (a.indate BETWEEN "%s" AND "%s") AND ('
                                 'a.crtime BETWEEN %s AND %s)%s' % (
                                     timezone_format % end, self.game_code,
-                                    cf.change_time_format(start, before=str_format, after='%Y-%m-%d',
+                                    cf.change_time_format(start, before=format_datetime_n, after=format_date_n,
                                                           interval=interval),
-                                    cf.change_time_format(end, before=str_format, after='%Y-%m-%d', interval=interval),
+                                    cf.change_time_format(end, before=format_datetime_n, after=format_date_n,
+                                                          interval=interval),
                                     timezone_format % start, timezone_format % end, login_where)}
             ]
             pay_info = cp.game_money_dict(self.platform, self.game_code, start, end, server=server,
@@ -186,13 +209,19 @@ class Builder(object):
             pay_info['parse'] = 'auto_game_parse'
             info_list.append(pay_info)
             for info in info_list:
-                request = self.request(**info)
-                yield request
+                key = info['meta']
+                if self.auto_pass is None or key not in self.auto_pass:  # 跳过部分自动采集
+                    request = self.request(**info)
+                    yield request
+                else:
+                    cf.print_log('（通用游戏数据采集流程）跳过%s的采集！' % key)
 
-            # 在线，需自行编写
-            # 在线要在后面获取，否则有概率发生引擎过快关闭的情况
+            # 个性化定制部分数据（online、register、login、pay）的采集，需自行编写
+            # 要在后面获取，否则有概率发生引擎过快关闭的情况
             # meta带上的server在有数据的情况下为一个列表，里面元素为字符串，是OSA配置的伺服器列表
-            request = self.request('test', parse='auto_online_collection', meta=server)
+            # meta还会带上开始时间start和结束时间end
+            meta = {'start': start, 'end': end, 'server': server}
+            request = self.request('test', parse='auto_collection_personalized', meta=meta)
             yield request
 
     def auto_game_parse(self, response):
@@ -208,13 +237,10 @@ class Builder(object):
         if key != 'online':
             cf.print_log('（通用游戏数据采集流程）获取到%s游戏的%s数据，数据长度%s！' % (self.game_code, key, len(source_data)))
 
-        # 通用参数
-        str_format = '%Y-%m-%d %H:%M:%S'
-
         # 在线
         if key == 'online':
             server_code = str(source_data['server_code'])
-            time = source_data.get('time', launch['datetime'].strftime('%Y-%m-%d %H:%M:%S'))[:-4] + '0:00'
+            time = source_data.get('time', launch['datetime'].strftime(format_datetime_n))[:-4] + '0:00'
             count = int(source_data['count'])
             data = {
                 'platform': self.platform,
@@ -227,11 +253,12 @@ class Builder(object):
         elif key in ('register', 'login'):
             for one_data in source_data:
                 user_id = str(one_data['userid'])
-                ip = one_data['ipaddr']
                 server_code = str(one_data['serid'])
-                os = one_data['comefrom']
-                time = one_data['regdate'].strftime(str_format) if key == 'register' else one_data['crtime'].strftime(
-                    str_format)
+                ip = one_data.get('ipaddr')
+                os = one_data.get('comefrom')
+                ip, os = self.__pegging_data(key, user_id, ip, os)  # 反查
+                time = one_data['regdate'].strftime(format_datetime_n) if key == 'register' else one_data[
+                    'crtime'].strftime(format_datetime_n)
                 dup_column = 'regtime' if key == 'register' else 'logintime'
                 data = {
                     'platform': self.platform,
@@ -249,10 +276,11 @@ class Builder(object):
                 order_id = one_data['gd_orderid']
                 server_code = str(one_data['servercode'])
                 user_id = str(one_data['userid'])
-                os = one_data['comefrom']
-                time = one_data['create_time'].strftime(str_format)
+                ip = one_data.get('user_ip')
+                os = one_data.get('comefrom')
+                ip, os = self.__pegging_data(key, user_id, ip, os)  # 反查
+                time = one_data['create_time'].strftime(format_datetime_n)
                 amt = one_data['epoint']
-                ip = one_data['user_ip']
                 data = {
                     'platform': self.platform,
                     'source': {'gamecode': self.game_code, 'order_id': order_id, 'servercode': server_code,
@@ -260,18 +288,16 @@ class Builder(object):
                 }
                 yield self.item(data, detail=key)
 
-    def auto_online_collection(self, response):
+    def auto_collection_personalized(self, response):
         """
-        公司平台暂时没有在线数据，只能由原厂提供，需要继承重写此函数获取在线数据
-        1.此函数一般都需要重写，除非原厂没提供获取在线数的方法，那就没有在线数据了
-        2.可自定义新函数入库在线数据，也可以用默认函数
-        3.如果使用默认函数入库，需遵守下面的规则：
+        个性化定制部分数据（online、register、login、pay）的采集
+        1.公司平台暂时没有online数据，如原厂提供了该数据，需要继承重写此函数获取
+        2.除了online数据，register、login、pay数据在需要个性化定制采集时也可以继承重写
+        3.可自定义新函数入库数据，也可以用默认函数（auto_game_parse）
+        4.如果使用默认函数入库，需遵守下面的规则：
             ① yield出去的Request对象，way属性为字符串test
             ② 续①，带上parse属性，为字符串auto_game_parse
-            ③ 续①，带上meta属性，为字符串online
-            ④ 续①，带上test_data属性，为一个字典，伺服器编码的key为server_code
-            ⑤ 续④，时间节点的key为time，格式“%Y-%m-%d %H:%M:%S”
-            ⑥ 续④，在线数的key为count，应该是一个数字
+            ③ 续①，带上meta属性，为字符串online、register、login、pay其一
         :param response:(type=Response) 引擎回传的响应对象
         :return item:(type=Item,Request) 内置数据、请求对象
         """
@@ -317,7 +343,7 @@ class Builder(object):
         country_name = '其他' if country == 'OTHER' else redis['127_0'].get('%s_country_name' % country)
         time = source_data['time']
         if isinstance(time, datetime):
-            time = time.strftime('%Y-%m-%d')
+            time = time.strftime(format_date_n)
         values = [source_data['game_code'], source_data['media'], source_data['osa_name'], device,
                   country, time, '%s-' % device_name, source_data['spend']]
         item_data['values'] = values

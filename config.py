@@ -142,12 +142,11 @@ ding_interval = 7200  # 2小时
 # 游戏采集时间节点间隔（单位：分）
 gc_interval = 10
 
-# 反查结果缓存的Redis
-pegging_redis = '127_8'
-
 # geoip2驱动路径
 geoip2_path = factory_config[factory_code]['geoip2_path']
 
 # 日期格式
 format_date = '%Y%m%d'
 format_datetime = '%Y%m%d%H%M'
+format_date_n = '%Y-%m-%d'
+format_datetime_n = '%Y-%m-%d %H:%M:%S'

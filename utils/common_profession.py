@@ -7,8 +7,8 @@ import json
 from datetime import datetime
 from geoip2 import database as geoip2_db, errors as geoip2_e
 import services  # 该模块在加载服务前就已经被导入，只能导入总模块，否则所有服务都会是加载前的None
-from config import ding_token, factory_config, factory_code, pegging_redis, geoip2_path, pk_st, pk_et, gc_interval, \
-    format_date, format_datetime
+from config import ding_token, factory_config, factory_code, geoip2_path, pk_st, pk_et, gc_interval, format_date, \
+    format_datetime
 from utils import common_function as cf
 from framework.error.check_error import CheckUnPass
 
@@ -59,14 +59,13 @@ def send_ding(msg, group, e=None):
     return result
 
 
-def game_money_dict(platform, game_code, start, end, e_point=False, server=None, timezone=None):
+def game_money_dict(platform, game_code, start, end, server=None, timezone=None):
     """
     构造获取平台储值的字典，用于构造请求
     :param platform:(type=str) 哪个平台，晶绮jq、和悦hy、初心cx
     :param game_code:(type=str) 游戏代码
     :param start:(type=str) 查询时间段的开始时间
     :param end:(type=str) 查询时间段的结束时间
-    :param e_point:(type=bool) 使用“epoint>0”的条件，默认不使用
     :param server:(type=list,tuple) 指定伺服器，注意里面的元素必须要str类型，默认None不指定
     :param timezone:(type=str) 是否需要转换时区，如需要转换的时区，格式“本地时区/目标时区”（例：+08:00/+09:00），默认None不转换时区
     :return request_dict:(type=dict) 用于构造内置请求对象所用参数的字典
@@ -80,31 +79,21 @@ def game_money_dict(platform, game_code, start, end, e_point=False, server=None,
         time_column = 'CONVERT_TZ(create_time,"%s","%s") AS create_time' % (l_time, t_time)
         timezone_format = 'CONVERT_TZ("%s","{}","{}")'.format(t_time, l_time)
 
-    # 采集方式
-    way = 'db'
-
-    # 数据库
-    db_name = '%s_realtime' % platform
-
-    # 表名
-    table = 'stored_value_record'
-
-    # 查询字段
-    columns = ['gd_orderid', 'servercode', 'epoint', 'userid', time_column,
-               'comefrom', 'user_ip']
+    # 固定参数
+    way = 'db'  # 采集方式
+    db_name = '%s_realtime' % platform  # 数据库
+    table = 'stored_value_record'  # 表名
+    columns = ['gd_orderid', 'servercode', 'epoint', 'userid', time_column, 'comefrom', 'user_ip']  # 查询字段
+    meta = 'pay'  # 储值标识
 
     # 查询条件
-    e_point = ' AND epoint>0' if e_point else ''
     if server:
         server_list = ['"%s"' % one_server for one_server in server]
         server = ' AND servercode in (%s)' % ','.join(server_list)
     else:
         server = ''
-    after_table = 'WHERE gamecode="%s" AND (create_time BETWEEN %s AND %s) AND status IN (1,4)%s%s' % (
-        game_code, timezone_format % start, timezone_format % end, e_point, server)
-
-    # 储值标识
-    meta = 'pay'
+    after_table = 'WHERE gamecode="%s" AND (create_time BETWEEN %s AND %s) AND status IN (1,4)%s' % (
+        game_code, timezone_format % start, timezone_format % end, server)
 
     # 构造字典并返回
     request_dict = {'way': way, 'db_name': db_name, 'table': table, 'columns': columns, 'after_table': after_table,
@@ -112,63 +101,49 @@ def game_money_dict(platform, game_code, start, end, e_point=False, server=None,
     return request_dict
 
 
-def u_pegging(platform, game_code, userid_list, type_list, pass_redis=False):
+def u_pegging(platform, uid_list, type_list):
     """
     根据userid反查数据，比如IP地址、系统
     :param platform:(type=str) 哪个平台，晶绮jq、和悦hy、初心cx
-    :param game_code:(type=str) 游戏代码
-    :param userid_list:(type=list,set) 要反查的userid列表
+    :param uid_list:(type=list,set) 要反查的user_id列表
     :param type_list:(type=list) 反查类型的列表，os为系统，ip为IP地址
-    :param pass_redis:(type=bool) 是否跳过查Redis，直接查MySQL，默认False
-    :return p_data:(type=dict) 反查的结果
+    :return p_data:(type=dict) 反查的结果，key为user_id，value为数据dict，例：{"12345": {"os": "IOS", "ip": "127.0.0.1"}}
     """
 
-    # 该函数的一些固定参数
+    # 初始化参数
     column_map = {'os': 'comefrom', 'ip': 'ipaddr'}  # MySQL字段映射
-    default = {'os': 'Android'}  # 默认值
-    redis_ex = 259200  # 缓存在Redis的时间，3d*24h*60m*60s=259200s
+    redis_ex = 604800  # 缓存在Redis的时间，7d*24h*60m*60s=604800s
     mysql_max = 100  # MySQL每批反查数量
+    p_data = dict()  # 最终数据
 
     # 数据库连接
     mysql = services.mysql['%s_realtime' % platform]
-    redis = services.redis[pegging_redis]
+    redis = services.redis['127_8']
 
-    # 最终的数据集合
-    p_data = dict()
-
-    # 1.从Redis根据puid查
-    none = set()  # Redis没查出来的puid集合
-    for userid in userid_list:
-        userid = str(userid)
+    # 1.从Redis根据user_id查
+    none = set()  # Redis没查出来的user_id集合
+    for user_id in uid_list:
+        user_id = str(user_id)
         for type_ in type_list:
-            p_data.setdefault(userid, dict())[type_] = default.get(type_, '')  # 把默认值赋予给数据集合
-            if not pass_redis:
-                data = redis.get(cf.calculate_fp([game_code, userid, type_]))  # 从Redis查
-                if data is None:  # 查不出来就记录
-                    none.add(userid)
-                else:  # 查得出来就覆盖数据集合
-                    p_data.setdefault(userid, dict())[type_] = data
-            else:
-                none.add(userid)
+            data = redis.get('%s-%s' % (user_id, type_))  # 从Redis查
+            if data is None:  # 查不出来就记录
+                none.add(user_id)
+            else:  # 查得出来就覆盖数据集合
+                p_data.setdefault(user_id, dict())[type_] = data
 
     # 2.Redis查不出的再从MySQL分批查
     none = list(none)
     len_ = len(none)
     for i in range(int(len_ / mysql_max) if not len_ % mysql_max else int(len_ / mysql_max) + 1):
         sql_data = mysql.select('game_user', columns=['userid'] + [column_map[type_] for type_ in type_list],
-                                after_table='WHERE gamecode="%s" AND userid IN (%s)' % (
-                                    game_code, ','.join(none[i * mysql_max: i * mysql_max + mysql_max])))
+                                after_table='WHERE userid IN (%s)' % (
+                                    ','.join(none[i * mysql_max: i * mysql_max + mysql_max])))
         for one_data in sql_data:
-            userid = str(one_data['userid'])
+            user_id = str(one_data['userid'])
             for type_ in type_list:
                 data = one_data[column_map[type_]]
-                if type_ == 'os':  # 设备还需要转换一下写法
-                    if data == 'android':
-                        data = 'Android'
-                    elif data == 'ios':
-                        data = 'IOS'
-                p_data.setdefault(userid, dict())[type_] = data
-                redis.set(cf.calculate_fp([game_code, userid, type_]), data, redis_ex)
+                p_data.setdefault(user_id, dict())[type_] = data
+                redis.set('%s-%s' % (user_id, type_), data, redis_ex)
 
     # 返回最终数据
     return p_data
@@ -296,19 +271,26 @@ def osa_server_dict(platform, game_code):
     return request_dict
 
 
-def get_argv(argv_key):
+def get_argv(argv_key, transform=False):
     """
     获取脚本传参
     :param argv_key:(type=str,list,tuple) 参数key，单个可直接传str，多个就传list或tuple（元素应为str）
+    :param transform:(type=bool) 是否把没传参的key转换为空字符串，True转换，默认False不转换
     :return result:(type=dict) 传参结果，dict的key为参数key，dict的value为传参（str或None，None则没有对应传参）
     """
 
     result = dict()
     if isinstance(argv_key, str):
-        result[argv_key] = getattr(services.argv, argv_key.replace('-', '_'))
+        value = getattr(services.argv, argv_key.replace('-', '_'))
+        if transform and value is None:
+            value = ''
+        result[argv_key] = value
     elif isinstance(argv_key, list) or isinstance(argv_key, tuple):
         for one_key in argv_key:
-            result[one_key] = getattr(services.argv, one_key.replace('-', '_'))
+            value = getattr(services.argv, one_key.replace('-', '_'))
+            if transform and value is None:
+                value = ''
+            result[one_key] = value
     else:
         raise CheckUnPass('“argv_key”只能为str类型（单个）或list、tuple类型（多个）！')
     return result
@@ -331,11 +313,11 @@ def old_analyse(platform, game_code):
     s, e = services.argv.start_time, services.argv.end_time
     if s is not None and e is not None and s.endswith('0000') and e.endswith('0000'):
         shell = '/usr/bin/python NewOperaData.py -b%s -g%s -d%s,%s -rn -py' % (
-            db_mapping[platform], game_code, start.strftime('%Y%m%d'), end.strftime('%Y%m%d'))
+            db_mapping[platform], game_code, start.strftime(format_date), end.strftime(format_date))
     else:
         shell = '/usr/bin/python NewOperaData.py -b%s -g%s -d%s,%s -r%s,%s -py' % (
-            db_mapping[platform], game_code, start.strftime('%Y%m%d'), end.strftime('%Y%m%d'),
-            start.strftime('%Y%m%d%H%M'), end.strftime('%Y%m%d%H%M'))
+            db_mapping[platform], game_code, start.strftime(format_date), end.strftime(format_date),
+            start.strftime(format_datetime), end.strftime(format_datetime))
     cf.print_log('执行报表！shell命令：%s' % shell)
     result = {'way': 'shell', 'parse': '_funny', 'cwd': '/data/shell/lib', 'shell': shell, 'check': False}
     return result

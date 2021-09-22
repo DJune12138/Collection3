@@ -48,7 +48,7 @@ import time
 import logging
 from threading import Lock
 import services
-from config import dk_plan, ding_interval, ding_is_send
+from config import dk_plan, ding_interval, ding_is_send, format_date, format_datetime_n
 from utils import common_function as cf, common_profession as cp
 
 
@@ -80,13 +80,13 @@ class Logger(object):
         if fmt is None:
             fmt = '%(asctime)s %(filename)s [line:%(lineno)d] %(levelname)s: %(message)s'
         if date_fmt is None:
-            date_fmt = '%Y-%m-%d %H:%M:%S'
+            date_fmt = format_datetime_n
         self.__file_formatter = logging.Formatter(fmt='\n\n\n' + fmt, datefmt=date_fmt)
         self.__console_formatter = logging.Formatter(fmt=fmt, datefmt=date_fmt)
 
         # 设置文件日志模式
         if log_name is None:
-            log_name = time.strftime('%Y%m%d')
+            log_name = time.strftime(format_date)
         self.__log_path = log_path
         self.__logger.addHandler(self.__get_file_handler(log_name))
 
@@ -165,7 +165,7 @@ class Logger(object):
 
                     # 重设Redis消息
                     if ding_result:
-                        self.redis.set(fp_key, time.strftime('%Y-%m-%d %H:%M:%S'), ex=ding_interval)
+                        self.redis.set(fp_key, time.strftime(format_datetime_n), ex=ding_interval)
 
         # 失败则不再发送，记录日志
         except Exception as e:

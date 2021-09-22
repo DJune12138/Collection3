@@ -12,6 +12,7 @@ import base64
 import subprocess
 import pytz
 import services  # 该模块在加载服务前就已经被导入，只能导入总模块，否则所有服务都会是加载前的None
+from config import format_date, format_date_n, format_datetime_n
 
 
 def print_log(msg):
@@ -21,7 +22,7 @@ def print_log(msg):
     """
 
     pid = '(%s)' % services.launch['pid'] if services.launch is not None else ''
-    print('%s%s：%s' % (time.strftime('%Y-%m-%d %H:%M:%S'), pid, msg))
+    print('%s%s：%s' % (time.strftime(format_datetime_n), pid, msg))
     sys.stdout.flush()
 
 
@@ -163,7 +164,7 @@ def datetime_timedelta(td_type, td_count, date_time=None, format_=None):
     return new_datetime
 
 
-def change_time_format(time_str, before='%Y%m%d', after='%Y-%m-%d', interval=0):
+def change_time_format(time_str, before=format_date, after=format_date_n, interval=0):
     """
     把时间字符串从一种格式转换去另一种格式，也可以根据间隔获取全新时间
     :param time_str:(type=str) 要转换的时间字符串
@@ -237,7 +238,7 @@ def shell_run(shell, cwd=None, timeout=None, check=True, pr_std=True, **kwargs):
     return result
 
 
-def timestamp_format(timestamp, format_='%Y-%m-%d %H:%M:%S', time_type='lt'):
+def timestamp_format(timestamp, format_=format_datetime_n, time_type='lt'):
     """
     时间戳格式化
     :param timestamp:(type=int,float) 时间戳，注意单位是秒，毫秒请自行除以1000转换成秒
@@ -256,7 +257,7 @@ def timestamp_format(timestamp, format_='%Y-%m-%d %H:%M:%S', time_type='lt'):
     return format_str
 
 
-def change_timezone(dt_str, t_timezone, l_timezone='Asia/Shanghai', time_format='%Y-%m-%d %H:%M:%S'):
+def change_timezone(dt_str, t_timezone, l_timezone='Asia/Shanghai', time_format=format_datetime_n):
     """
     把一个时区的时间转去另外一个时区的时间
     :param dt_str:(type=str) 要转换的时间字符串

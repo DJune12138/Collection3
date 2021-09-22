@@ -332,3 +332,21 @@ V1.9.3
     1.下载器的web方法，is_json参数废弃，改成web_type参数，通过该参数控制返回web数据的类型
 新增：
     1.现在下载器web方法可以通过web_type参数传入“xpath”解析成Element对象了
+
+
+
+V1.10
+发布日期：2021-09-18
+简述：增加反查ip和os的功能，增加可个性化定制通用游戏数据采集流程部分数据的功能。
+新增：
+    1.建造器增加pegging_field属性，并增加对应逻辑，现在当原厂没有提供ip和os时可以反查了
+    2.建造器增加auto_pass属性与auto_collection_personalized方法，可以在使用通用游戏数据采集流程时用于个性化定制部分数据采集
+修复（改）：
+    1.auto_online_collection方法变更成auto_collection_personalized方法，现在在线数据采集纳入个性化定制功能了
+    2.业务公共函数u_pegging适配反查功能优化了一些逻辑
+    3.管道略微优化一些变量与逻辑
+    4.config略微优化一些变量
+    5.业务公共函数get_argv现在可通过transform传参控制是否自动返回空字符串
+    6.业务公共函数game_money_dict去掉e_point条件
+    7.框架里的代码涉及到日期格式都改用config配置的格式
+    8.建造器的auto_collection_personalized的meta属性改成dict类型，带上start、end和server

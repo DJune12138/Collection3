@@ -63,19 +63,18 @@ class Pipeline(object):
                 user_id = source['userid']
                 p_uid = source.get('puid') if source.get('puid') else user_id
                 ip = source.get('ip')
-                ip = ip if ip is not None else ''  # 未知情况下IP传入时就是为None，防止后续字符串拼接报错，当为None时为空字符串
-                area = cp.ip_belong(ip)['code']
-                area_code = 'TW' if area == '' else area
-                source_os = source.get('os', '')
+                ip = '' if ip is None else ip  # 可能传入时就为None，但需要用字符串，要转换下
+                area_code = cp.ip_belong(ip)['code']
+                area_code = 'TW' if area_code == '' else area_code
+                os = source.get('os')
+                os = '' if os is None else os  # 同ip
                 if detail == 'pay':
-                    os = 'IOS' if 'ios' in source_os.lower() else 'Android'
+                    os = 'IOS' if 'ios' in os.lower() else 'Android'
                 else:
-                    if 'ios' in source_os.lower():
+                    if 'ios' in os.lower():
                         os = 'IOS'
-                    elif 'android' in source_os.lower() or not source_os:
+                    elif 'android' in os.lower() or not os:
                         os = 'Android'
-                    else:
-                        os = source_os
                 if detail == 'register':  # 注册
                     data['table'] = 'oper_game_user'
                     data['columns'] = ['gamecode', 'servercode', 'regdate', 'userid', 'puid',
