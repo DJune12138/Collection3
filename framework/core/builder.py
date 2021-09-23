@@ -41,11 +41,19 @@ class Builder(object):
     platform = None  # 游戏所属平台，类型为字符串：晶绮（jq）、初心（cx）、和悦（hy）
 
     # 如使用通用的游戏数据采集流程，以下参数可选继承重写
-    osa_server = False  # 根据该参数判定是否只获取OSA配置的伺服器的数据，默认False
-    timezone = None  # 是否需要转换时区，如需要转换的时区，则填写str，格式“本地时区/目标时区”（例：+08:00/+09:00），默认None不转换时区
-    old_report = False  # 是否自动生成游戏数据采集流程的旧报表
-    pegging_field = None  # 反查ip或os，例：{"register": ["ip"], "login": ["ip", "os"]}
+    osa_server = False  # 根据该参数判定是否只获取OSA配置的伺服器的数据
+    timezone = None  # 是否需要转换时区，如需要转换的时区，则填写str，格式“本地时区/目标时区”，例：+08:00/+09:00
     auto_pass = None  # 跳过自动采集register、login或pay以供后续个性化定制，例：["register"]、["register", "login", "pay"]
+
+    # 是否自动生成游戏数据采集流程的旧版报表
+    # 由于OSA设计问题，旧版报表需要另外生成，该参数设置为True可自动生成旧版报表
+    old_report = False
+
+    # 入库明细时反查IP或OS
+    # 有部分数据来源可能无法提供IP或OS信息，只能通过反查注册平台账号时的信息来写入
+    # 注册register、登录login、储值pay可分别反查，根据需要填入字段
+    # 例：{"register": ["ip"], "login": ["ip", "os"], "pay": ["os"]}
+    pegging_field = None
 
     def __new__(cls, *args, **kwargs):
         """
@@ -68,13 +76,13 @@ class Builder(object):
 
     def __pegging_data(self, key, user_id, ip, os):
         """
-        反查ip或os的逻辑，这个函数不用于继承重写
+        反查IP或OS的逻辑，这个函数不用于继承重写
         :param key:(type=str) 数据类型，register、login、pay
         :param user_id:(type=str) 要反查的账户id
-        :param ip:(type=str,None) 原始获取的ip
-        :param os:(type=str,None) 原始获取的os
-        :return ip:(type=str,None) 符合条件后反查的ip，不符合则原始ip
-        :return os:(type=str,None) 符合条件后反查的os，不符合则原始os
+        :param ip:(type=str,None) 原始获取的IP
+        :param os:(type=str,None) 原始获取的OS
+        :return ip:(type=str,None) 符合条件后反查的IP，不符合则原始IP
+        :return os:(type=str,None) 符合条件后反查的OS，不符合则原始OS
         """
 
         # 启用转换
