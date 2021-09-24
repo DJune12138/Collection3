@@ -350,3 +350,11 @@ V1.10
     6.业务公共函数game_money_dict去掉e_point条件
     7.框架里的代码涉及到日期格式都改用config配置的格式
     8.建造器的auto_collection_personalized的meta属性改成dict类型，带上start、end和server
+
+
+
+V1.10.1
+发布日期：2021-09-24
+简述：修复一个因业务编写错误而甩锅给框架错误的问题。
+修复（改）：
+    1.引擎在加载模块时多加一个捕获Exception异常，从而在加载业务模块时正确判定为业务级错误

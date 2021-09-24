@@ -115,6 +115,9 @@ class Engine(object):
                 except ModuleNotFoundError:
                     logger.exception('%s为%s的模块不存在，请检查目录结构是否正确！如使用*，请不要把无关文件（夹）放在对应模块下！' % (type_, code))
                     continue
+                except Exception:
+                    logger.exception('%s为%s的模块加载失败！' % (type_, code))
+                    continue
 
                 # 1.2 校验建造器规范
                 try:
