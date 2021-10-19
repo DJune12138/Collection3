@@ -242,20 +242,21 @@ class Builder(object):
         # 获取数据标识与源数据
         key = response.meta
         source_data = response.data
-        if key != 'online':
-            cf.print_log('（通用游戏数据采集流程）获取到%s游戏的%s数据，数据长度%s！' % (self.game_code, key, len(source_data)))
+        cf.print_log('（通用游戏数据采集流程）获取到%s游戏的%s数据，数据长度%s！' % (self.game_code, key, len(source_data)))
 
         # 在线
         if key == 'online':
-            server_code = str(source_data['server_code'])
-            time = source_data.get('time', services.launch['datetime'].strftime(config.format_datetime_n))[:-4] + '0:00'
-            count = int(source_data['count'])
-            data = {
-                'platform': self.platform,
-                'source': {'gamecode': self.game_code, 'servercode': server_code, 'time': time,
-                           'count': count}
-            }
-            yield self.item(data, detail=key)
+            for one_data in source_data:
+                server_code = str(one_data['server_code'])
+                time = one_data.get('time', services.launch['datetime'].strftime(config.format_datetime_n))[
+                       :-4] + '0:00'
+                count = int(one_data['count'])
+                data = {
+                    'platform': self.platform,
+                    'source': {'gamecode': self.game_code, 'servercode': server_code, 'time': time,
+                               'count': count, 'duplicates': ['online_count']}
+                }
+                yield self.item(data, detail=key)
 
         # 注册、登录
         elif key in ('register', 'login'):

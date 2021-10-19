@@ -368,3 +368,4 @@ V1.10.2
     1.建造器增加cf、cp、services、config四个常用模块的接口，现在业务建造器可以不再每次导入这些模块，可直接self使用
 修复（改）：
     1.业务公共函数time_quantum增加偏移量用于延迟数据补充入库
+    2.建造器的通用游戏数据采集流程的online，现在改成接收list数据，并且唯一键冲突会update（启用duplicates）online_count字段了
