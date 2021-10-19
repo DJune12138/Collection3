@@ -197,7 +197,7 @@ def ip_belong(ip, redis='127_0'):
     return result
 
 
-def time_quantum(dt_format=None, is_date=False):
+def time_quantum(dt_format=None, is_date=False, start_offset=False):
     """
     根据脚本传参，返回开始与结束时间，所有时间均自动转化为整十分
     1.开始时间与结束时间均没有传入，则结束时间为当前时间，开始时间为上一个节点
@@ -207,14 +207,17 @@ def time_quantum(dt_format=None, is_date=False):
     5.若is_date为True，则不为以上规则，规则只有一条，就是开始和结束都默认为当天零点
     :param dt_format:(type=str) 返回格式化时间的格式，默认None则直接返回datetime对象
     :param is_date:(type=bool) 是否以日为单位，即使用第五点规则，默认False不使用
+    :param start_offset:(type=bool) 入库明细时为防止有延迟数据，统计范围的开始时间需要往前推特定偏移量；is_date为True则该参数失效
     :return start_datetime:(type=datetime,str) 开始时间，根据dt_format返回datetime或str
     :return end_datetime:(type=datetime,str) 结束时间，同上
+    :return start_dt_offset:(type=datetime,str) 当启用start_offset才会返回，根据偏移量得到的开始时间，其余同上
     """
 
     # 基础参数
     now_datetime = services.launch['datetime']
     argv = get_argv((pk_st, pk_et))
     start_time, end_time = argv[pk_st], argv[pk_et]
+    offset_unit = -50  # 开始时间偏移量（单位：分钟）
 
     # 根据规则转化时间
     if not is_date:
@@ -235,10 +238,21 @@ def time_quantum(dt_format=None, is_date=False):
         start_datetime = default_date if start_time is None else datetime.strptime(start_time, format_date)
         end_datetime = default_date if end_time is None else datetime.strptime(end_time, format_date)
 
+    # 偏移开始时间
+    if not is_date and start_offset:
+        start_dt_offset = cf.datetime_timedelta('minutes', offset_unit, date_time=start_datetime)
+    else:
+        start_dt_offset = None
+
     # 返回结果
     if dt_format is not None:
         start_datetime, end_datetime = start_datetime.strftime(dt_format), end_datetime.strftime(dt_format)
-    return start_datetime, end_datetime
+        if start_dt_offset:
+            start_dt_offset = start_dt_offset.strftime(dt_format)
+    if not start_dt_offset:
+        return start_datetime, end_datetime
+    else:
+        return start_datetime, end_datetime, start_dt_offset
 
 
 def osa_server_dict(platform, game_code):

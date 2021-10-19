@@ -6,12 +6,12 @@
 
 import re
 from datetime import datetime
+import services
+import config
+from utils import common_profession as cp, common_function as cf
 from framework.object.request import Request
 from framework.object.item import Item
 from framework.error.check_error import CheckUnPass
-from utils import common_profession as cp, common_function as cf
-from services import launch, redis
-from config import format_date_n, format_datetime_n
 
 
 class Builder(object):
@@ -162,7 +162,7 @@ class Builder(object):
 
         # 注册、登录、储值
         if not self.osa_server or response is not None:
-            start, end = cp.time_quantum(dt_format=format_datetime_n)  # 开始与结束时间
+            start, end = cp.time_quantum(dt_format=config.format_datetime_n)  # 开始与结束时间
             cf.print_log('（通用游戏数据采集流程）%s 执行 %s ~ %s' % (self.game_code, start, end))
             server_data = response.data
             server, register_where, login_where = None, '', ''
@@ -175,7 +175,7 @@ class Builder(object):
                 register_where = ' AND serid in (%s)' % ','.join(str_server)
                 login_where = ' AND a.serid in (%s)' % ','.join(str_server)
             db_name = '%s_sdk' % self.platform  # 查询数据库
-            start = cf.change_time_format(start, before=format_datetime_n, after=format_datetime_n,
+            start = cf.change_time_format(start, before=config.format_datetime_n, after=config.format_datetime_n,
                                           interval=-3000)  # SDK延迟，开始时间推前50分钟
             register_time, login_time, timezone_format, interval = 'regdate', 'a.crtime', '"%s"', 0
             if self.timezone is not None:  # 根据时区转换数据时间
@@ -206,10 +206,10 @@ class Builder(object):
                                 'b.regdate<=%s AND a.gamecode="%s" AND (a.indate BETWEEN "%s" AND "%s") AND ('
                                 'a.crtime BETWEEN %s AND %s)%s' % (
                                     timezone_format % end, self.game_code,
-                                    cf.change_time_format(start, before=format_datetime_n, after=format_date_n,
-                                                          interval=interval),
-                                    cf.change_time_format(end, before=format_datetime_n, after=format_date_n,
-                                                          interval=interval),
+                                    cf.change_time_format(start, before=config.format_datetime_n,
+                                                          after=config.format_date_n, interval=interval),
+                                    cf.change_time_format(end, before=config.format_datetime_n,
+                                                          after=config.format_date_n, interval=interval),
                                     timezone_format % start, timezone_format % end, login_where)}
             ]
             pay_info = cp.game_money_dict(self.platform, self.game_code, start, end, server=server,
@@ -248,7 +248,7 @@ class Builder(object):
         # 在线
         if key == 'online':
             server_code = str(source_data['server_code'])
-            time = source_data.get('time', launch['datetime'].strftime(format_datetime_n))[:-4] + '0:00'
+            time = source_data.get('time', services.launch['datetime'].strftime(config.format_datetime_n))[:-4] + '0:00'
             count = int(source_data['count'])
             data = {
                 'platform': self.platform,
@@ -265,8 +265,8 @@ class Builder(object):
                 ip = one_data.get('ipaddr')
                 os = one_data.get('comefrom')
                 ip, os = self.__pegging_data(key, user_id, ip, os)  # 反查
-                time = one_data['regdate'].strftime(format_datetime_n) if key == 'register' else one_data[
-                    'crtime'].strftime(format_datetime_n)
+                time = one_data['regdate'].strftime(config.format_datetime_n) if key == 'register' else one_data[
+                    'crtime'].strftime(config.format_datetime_n)
                 dup_column = 'regtime' if key == 'register' else 'logintime'
                 data = {
                     'platform': self.platform,
@@ -287,7 +287,7 @@ class Builder(object):
                 ip = one_data.get('user_ip')
                 os = one_data.get('comefrom')
                 ip, os = self.__pegging_data(key, user_id, ip, os)  # 反查
-                time = one_data['create_time'].strftime(format_datetime_n)
+                time = one_data['create_time'].strftime(config.format_datetime_n)
                 amt = one_data['epoint']
                 data = {
                     'platform': self.platform,
@@ -348,10 +348,10 @@ class Builder(object):
             device_name = 'other'
         country = source_data['country'].upper()
         country = 'OTHER' if not country or country in ('NONE', 'UNKNOWN') else country
-        country_name = '其他' if country == 'OTHER' else redis['127_0'].get('%s_country_name' % country)
+        country_name = '其他' if country == 'OTHER' else services.redis['127_0'].get('%s_country_name' % country)
         time = source_data['time']
         if isinstance(time, datetime):
-            time = time.strftime(format_date_n)
+            time = time.strftime(config.format_date_n)
         values = [source_data['game_code'], source_data['media'], source_data['osa_name'], device,
                   country, time, '%s-' % device_name, source_data['spend']]
         item_data['values'] = values
@@ -416,3 +416,39 @@ class Builder(object):
 
         item = Item(*args, **kwargs)
         return item
+
+    @property
+    def cf(self):
+        """
+        为业务建造器提供框架cf模块的接口
+        :return item:(type=module) cf模块对象
+        """
+
+        return cf
+
+    @property
+    def cp(self):
+        """
+        为业务建造器提供框架cp模块的接口
+        :return item:(type=module) cp模块对象
+        """
+
+        return cp
+
+    @property
+    def services(self):
+        """
+        为业务建造器提供框架services模块的接口
+        :return item:(type=module) services模块对象
+        """
+
+        return services
+
+    @property
+    def config(self):
+        """
+        为业务建造器提供框架config模块的接口
+        :return item:(type=module) config模块对象
+        """
+
+        return config
