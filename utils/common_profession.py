@@ -5,6 +5,7 @@
 import os
 import json
 from datetime import datetime
+from copy import deepcopy
 from geoip2 import database as geoip2_db, errors as geoip2_e
 import services  # 该模块在加载服务前就已经被导入，只能导入总模块，否则所有服务都会是加载前的None
 from config import ding_token, factory_config, factory_code, geoip2_path, pk_st, pk_et, gc_interval, format_date, \
@@ -106,7 +107,7 @@ def u_pegging(platform, uid_list, type_list):
     根据userid反查数据，比如IP地址、系统
     :param platform:(type=str) 哪个平台，晶绮jq、和悦hy、初心cx
     :param uid_list:(type=list,set) 要反查的user_id列表
-    :param type_list:(type=list) 反查类型的列表，os为系统，ip为IP地址
+    :param type_list:(type=list) 反查类型的列表，os为系统，ip为IP地址，os_hw为启用替换华为os功能
     :return p_data:(type=dict) 反查的结果，key为user_id，value为数据dict，例：{"12345": {"os": "IOS", "ip": "127.0.0.1"}}
     """
 
@@ -119,6 +120,15 @@ def u_pegging(platform, uid_list, type_list):
     # 数据库连接
     mysql = services.mysql['%s_realtime' % platform]
     redis = services.redis['127_8']
+
+    # 替换华为os功能
+    os_hw = False
+    if 'os_hw' in type_list:
+        type_list = deepcopy(type_list)
+        os_hw = True
+        type_list.remove('os_hw')
+        if 'os' not in type_list:
+            type_list.append('os')
 
     # 1.从Redis根据user_id查
     none = set()  # Redis没查出来的user_id集合
@@ -135,15 +145,23 @@ def u_pegging(platform, uid_list, type_list):
     none = list(none)
     len_ = len(none)
     for i in range(int(len_ / mysql_max) if not len_ % mysql_max else int(len_ / mysql_max) + 1):
-        sql_data = mysql.select('game_user', columns=['userid'] + [column_map[type_] for type_ in type_list],
-                                after_table='WHERE userid IN (%s)' % (
-                                    ','.join(none[i * mysql_max: i * mysql_max + mysql_max])))
+        columns = ['userid'] + [column_map[type_] for type_ in type_list]
+        if os_hw:
+            columns += ['platform']
+        sql_data = mysql.select('game_user', columns=columns, after_table='WHERE userid IN (%s)' % (
+            ','.join(none[i * mysql_max: i * mysql_max + mysql_max])))
         for one_data in sql_data:
             user_id = str(one_data['userid'])
             for type_ in type_list:
-                data = one_data[column_map[type_]]
-                if type_ == 'os':
-                    data = 'IOS' if 'ios' in data.lower() else 'Android'  # os暂时只分为安卓与苹果
+                if os_hw and type_ == 'os':
+                    if 'ios' in one_data['comefrom'].lower():
+                        data = 'IOS'
+                    else:
+                        data = 'hw' if one_data['platform'] == 'Huawei' else 'Android'
+                else:
+                    data = one_data[column_map[type_]]
+                    if type_ == 'os':
+                        data = 'IOS' if 'ios' in data.lower() else 'Android'  # os暂时只分为安卓与苹果
                 p_data.setdefault(user_id, dict())[type_] = data
                 redis.set('%s-%s' % (user_id, type_), data, redis_ex)
 
@@ -292,16 +310,15 @@ def get_argv(argv_key, transform=False):
     获取脚本传参
     :param argv_key:(type=str,list,tuple) 参数key，单个可直接传str，多个就传list或tuple（元素应为str）
     :param transform:(type=bool) 是否把没传参的key转换为空字符串，True转换，默认False不转换
-    :return result:(type=dict) 传参结果，dict的key为参数key，dict的value为传参（str或None，None则没有对应传参）
+    :return result:(type=str,None,dict) 传参结果，如argv_key为单个str则直接返回该结果，否则返回多个结果组成的dict
     """
 
-    result = dict()
     if isinstance(argv_key, str):
-        value = getattr(services.argv, argv_key.replace('-', '_'))
-        if transform and value is None:
-            value = ''
-        result[argv_key] = value
+        result = getattr(services.argv, argv_key.replace('-', '_'))
+        if transform and result is None:
+            result = ''
     elif isinstance(argv_key, list) or isinstance(argv_key, tuple):
+        result = dict()
         for one_key in argv_key:
             value = getattr(services.argv, one_key.replace('-', '_'))
             if transform and value is None:

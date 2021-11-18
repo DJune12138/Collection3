@@ -350,21 +350,21 @@ class Engine(object):
 
             # 处理异常
             except FaultReturn:  # 校验yield不通过
-                self.__add_request(Request('test', parse='_funny'), builder_name)  # 彩蛋请求，作用同上
                 logger.exception(self.__fr_warning.format(
                     builder_name, 'auto_game_collection' if a_gc else request_type))
+                self.__add_request(Request('test', parse='_funny'), builder_name)  # 彩蛋请求，作用同上
             except TypeDifferent:  # 校验类型不通过
-                self.__add_request(Request('test', parse='_funny'), builder_name)
                 logger.exception(self.__td_warning.format(builder_name))
+                self.__add_request(Request('test', parse='_funny'), builder_name)
             except ArgumentNumError:  # 校验函数传参不通过
-                self.__add_request(Request('test', parse='_funny'), builder_name)
                 logger.exception(self.__ane_warning.format(builder_name))
+                self.__add_request(Request('test', parse='_funny'), builder_name)
             except CheckUnPass:  # start校验不通过
-                self.__add_request(Request('test', parse='_funny'), builder_name)
                 logger.exception(self.__cu_warning.format(builder_name))
-            except Exception as e:  # 其他业务级错误
                 self.__add_request(Request('test', parse='_funny'), builder_name)
+            except Exception as e:  # 其他业务级错误
                 logger.ding_exception(self.__b_warning.format(builder_name), e, builder_name)
+                self.__add_request(Request('test', parse='_funny'), builder_name)
 
         # 3.检索所有业务建造器后，如该点没有任务，则标记不再循环启动引擎
         if no_task:
@@ -474,7 +474,7 @@ class Engine(object):
             if not isinstance(F_every_async, int) or F_every_async < 1:
                 raise CheckUnPass('配置config中的并发倍数F_every_async不为int类型或小于1，请修改！')
             self.__pool = Pool(F_max_async)
-        argv_ea = cp.get_argv(pk_ea)[pk_ea]
+        argv_ea = cp.get_argv(pk_ea)
         if argv_ea is not None:
             try:
                 argv_ea = int(argv_ea)

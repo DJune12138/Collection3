@@ -63,6 +63,7 @@ pk_et = 'end-time'
 pk_ea = 'every-async'
 pk_ps = 'pass-something'
 pk_jd = 'just-do'
+pk_type = 'type'
 p_parser = {  # 所有传参构成的字典
     pk_main: {  # 主参数
         pk_dt: {
@@ -113,6 +114,10 @@ p_parser = {  # 所有传参构成的字典
         pk_jd: {
             pk_simple: 'j',
             pk_help: '只做某些步骤，不同业务不同用法，具体参照业务参数说明。'
+        },
+        pk_type: {
+            pk_simple: 't',
+            pk_help: '执行类型，不同业务不同用法，具体参照业务参数说明。'
         }
     }
 }
@@ -120,7 +125,7 @@ p_parser = {  # 所有传参构成的字典
 # 日志器配置
 # 如使用默认参数，则为None
 logger_config = {
-    'level': None,
+    'level': 'error',
     'fmt': None,
     'date_fmt': None,
     'log_path': factory_config[factory_code]['logger_config.log_path'],

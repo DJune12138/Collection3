@@ -68,13 +68,10 @@ class Pipeline(object):
                 area_code = 'TW' if area_code == '' else area_code
                 os = source.get('os')
                 os = '' if os is None else os  # 同ip
-                if detail == 'pay':
-                    os = 'IOS' if 'ios' in os.lower() else 'Android'
-                else:
-                    if 'ios' in os.lower():
-                        os = 'IOS'
-                    elif 'android' in os.lower() or not os:
-                        os = 'Android'
+                if os.lower() == 'ios':
+                    os = 'IOS'
+                elif os.lower() == 'android' or not os:
+                    os = 'Android'
                 if detail == 'register':  # 注册
                     data['table'] = 'oper_game_user'
                     data['columns'] = ['gamecode', 'servercode', 'regdate', 'userid', 'puid',

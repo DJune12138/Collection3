@@ -25,10 +25,11 @@ class Builder(object):
     name = None
 
     # 默认初始请求
-    # 继承类后重写该属性即可，必须为list类型
+    # 继承类后重写该属性即可，必须为list类型（或str类型，启用特殊功能）
     # 目前只有start_requests方法会调用该属性，如继承类后重写了start_requests方法，可以不需要该属性
     # 元素必须为dict类型，且必须有“way”这对键值
     # 原生start_requests函数会把列表中每一个mapping作为关键字参数构建请求对象
+    # str类型为启用特殊功能，具体功能详见start_requests函数
     start = [{'way': 'test', 'parse': '_funny'}]
 
     # 是否使用通用的游戏数据采集流程
@@ -47,12 +48,14 @@ class Builder(object):
 
     # 是否自动生成游戏数据采集流程的旧版报表
     # 由于OSA设计问题，旧版报表需要另外生成，该参数设置为True可自动生成旧版报表
+    # 传入True则在end_requests_1函数执行，传入int类型则在对应编号的end_requests函数执行
     old_report = False
 
     # 入库明细时反查IP或OS
     # 有部分数据来源可能无法提供IP或OS信息，只能通过反查注册平台账号时的信息来写入
     # 注册register、登录login、储值pay可分别反查，根据需要填入字段
     # 例：{"register": ["ip"], "login": ["ip", "os"], "pay": ["os"]}
+    # 如果要启用替换华为os功能，则为os_hw，例：{"register": ["os_hw"]}
     pegging_field = None
 
     def __new__(cls, *args, **kwargs):
@@ -61,7 +64,10 @@ class Builder(object):
         """
 
         if cls.old_report:
-            setattr(cls, 'end_requests_1', cls.__def_old_report)
+            if isinstance(cls.old_report, bool):  # Python3有个奇怪判断，True能纳入int类型，这里需要额外一个判断
+                setattr(cls, 'end_requests_1', cls.__def_old_report)
+            elif isinstance(cls.old_report, int):
+                setattr(cls, 'end_requests_%s' % cls.old_report, cls.__def_old_report)
         return object.__new__(cls)
 
     def __def_old_report(self):
@@ -113,9 +119,24 @@ class Builder(object):
         :return request:(type=Request) 初始请求对象
         """
 
-        if not isinstance(self.start, list):
-            raise CheckUnPass('建造器的start必须为list类型！')
-        for info in self.start:
+        # 根据start类型开启功能
+        # list类型为正常类型，直接执行
+        if isinstance(self.start, list):
+            start = self.start
+
+        # str类型会启用特殊功能
+        elif isinstance(self.start, str):
+            if self.start == 'osa_server':  # 1.查询OSA配置伺服器
+                start = [cp.osa_server_dict(self.platform, self.game_code)]
+            else:
+                raise CheckUnPass('建造器的start目前支持的功能有：1.osa_server（查询OSA配置伺服器）')
+
+        # 其余类型均不支持，报错
+        else:
+            raise CheckUnPass('建造器的start正常使用必须为list类型！如启用特殊功能可传入str类型，具体功能请查看建造器start_requests函数。')
+
+        # 执行初始请求
+        for info in start:
             if not isinstance(info, dict) or 'way' not in info.keys():
                 raise CheckUnPass('建造器的start列表里元素必须为dict类型，且必须有“way”这对键值！')
             request = self.request(**info)
