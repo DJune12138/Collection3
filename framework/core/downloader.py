@@ -85,18 +85,19 @@ class Downloader(object):
 
         # 根据db_type，获取对应数据库数据
         db_type = kwargs.get('db_type', 'mysql')
-        db_name = kwargs.get('db_name')
+        db_object = kwargs.get('db_object')  # 传入一个数据库对象则使用该数据库
+        db_name = kwargs.get('db_name')  # 传入一个name则使用配置数据库，前提是不传入db_object
         if db_type == 'mysql':
-            mysql_db = mysql[db_name]
+            mysql_db = mysql[db_name] if db_object is None else db_object
             if kwargs.get('sql') is None:  # 根据有没有SQL语句，决定用什么函数
                 result = mysql_db.select(**kwargs)
             else:
                 result = mysql_db.execute(**kwargs)
         elif db_type == 'redis':
-            redis_db = redis[db_name]
+            redis_db = redis[db_name] if db_object is None else db_object
             result = getattr(redis_db, kwargs.get('redis_get', 'get'))(**kwargs)
         elif db_type == 'clickhouse':
-            clickhouse_db = clickhouse[db_name]
+            clickhouse_db = clickhouse[db_name] if db_object is None else db_object
             if kwargs.get('sql') is None:
                 result = clickhouse_db.select(**kwargs)
             else:
