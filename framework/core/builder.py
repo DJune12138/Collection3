@@ -183,7 +183,7 @@ class Builder(object):
 
         # 注册、登录、储值
         if not self.osa_server or response is not None:
-            start, end = cp.time_quantum(dt_format=config.format_datetime_n)  # 开始与结束时间
+            start, end, start_offset = cp.time_quantum(dt_format=config.format_datetime_n, start_offset=True)
             cf.print_log('（通用游戏数据采集流程）%s 执行 %s ~ %s' % (self.game_code, start, end))
             server_data = response.data
             server, register_where, login_where = None, '', ''
@@ -196,8 +196,6 @@ class Builder(object):
                 register_where = ' AND serid in (%s)' % ','.join(str_server)
                 login_where = ' AND a.serid in (%s)' % ','.join(str_server)
             db_name = '%s_sdk' % self.platform  # 查询数据库
-            start = cf.change_time_format(start, before=config.format_datetime_n, after=config.format_datetime_n,
-                                          interval=-3000)  # SDK延迟，开始时间推前50分钟
             register_time, login_time, timezone_format, interval = 'regdate', 'a.crtime', '"%s"', 0
             if self.timezone is not None:  # 根据时区转换数据时间
                 l_time = self.timezone.split('/')[0]  # 本地时区
@@ -218,7 +216,7 @@ class Builder(object):
                  'table': 'oper_game_user',
                  'columns': ['userid', 'comefrom', 'ipaddr', register_time, 'serid'],
                  'after_table': 'WHERE gamecode="%s" AND (regdate BETWEEN %s AND %s)%s' % (
-                     self.game_code, timezone_format % start, timezone_format % end, register_where)},
+                     self.game_code, timezone_format % start_offset, timezone_format % end, register_where)},
                 # 登录
                 {'way': 'db', 'parse': 'auto_game_parse', 'meta': 'login', 'db_name': db_name,
                  'table': 'oper_game_login AS a,oper_game_user AS b',
@@ -227,13 +225,13 @@ class Builder(object):
                                 'b.regdate<=%s AND a.gamecode="%s" AND (a.indate BETWEEN "%s" AND "%s") AND ('
                                 'a.crtime BETWEEN %s AND %s)%s' % (
                                     timezone_format % end, self.game_code,
-                                    cf.change_time_format(start, before=config.format_datetime_n,
+                                    cf.change_time_format(start_offset, before=config.format_datetime_n,
                                                           after=config.format_date_n, interval=interval),
                                     cf.change_time_format(end, before=config.format_datetime_n,
                                                           after=config.format_date_n, interval=interval),
-                                    timezone_format % start, timezone_format % end, login_where)}
+                                    timezone_format % start_offset, timezone_format % end, login_where)}
             ]
-            pay_info = cp.game_money_dict(self.platform, self.game_code, start, end, server=server,
+            pay_info = cp.game_money_dict(self.platform, self.game_code, start_offset, end, server=server,
                                           timezone=self.timezone)  # 储值
             pay_info['parse'] = 'auto_game_parse'
             info_list.append(pay_info)
@@ -249,7 +247,7 @@ class Builder(object):
             # 要在后面获取，否则有概率发生引擎过快关闭的情况
             # meta带上的server在有数据的情况下为一个列表，里面元素为字符串，是OSA配置的伺服器列表
             # meta还会带上开始时间start和结束时间end
-            meta = {'start': start, 'end': end, 'server': server}
+            meta = {'start': start_offset, 'end': end, 'server': server}
             request = self.request('test', parse='auto_collection_personalized', meta=meta)
             yield request
 

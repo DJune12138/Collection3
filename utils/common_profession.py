@@ -72,33 +72,35 @@ def game_money_dict(platform, game_code, start, end, server=None, timezone=None)
     :return request_dict:(type=dict) 用于构造内置请求对象所用参数的字典
     """
 
-    # 时区转换问题
-    time_column, timezone_format = 'create_time', '"%s"'
+    # 时区转换
+    time_column, timezone_format = 'a.create_time', '"%s"'
     if timezone is not None:
         l_time = timezone.split('/')[0]  # 本地时区
         t_time = timezone.split('/')[1]  # 目标时区
-        time_column = 'CONVERT_TZ(create_time,"%s","%s") AS create_time' % (l_time, t_time)
+        time_column = 'CONVERT_TZ(a.create_time,"%s","%s") create_time' % (l_time, t_time)
         timezone_format = 'CONVERT_TZ("%s","{}","{}")'.format(t_time, l_time)
 
     # 固定参数
-    way = 'db'  # 采集方式
-    db_name = '%s_realtime' % platform  # 数据库
-    table = 'stored_value_record'  # 表名
-    columns = ['gd_orderid', 'servercode', 'epoint', 'userid', time_column, 'comefrom', 'user_ip']  # 查询字段
+    way = 'db'
     meta = 'pay'  # 储值标识
+    db_name = '%s_realtime' % platform
+    table = 'stored_value_record a LEFT JOIN game_user b ON a.userid=b.userid'
+    columns = ['a.gd_orderid', 'a.servercode', 'a.epoint', 'a.userid', time_column, 'b.comefrom', 'b.ipaddr user_ip']
 
-    # 查询条件
+    # 伺服器
     if server:
         server_list = ['"%s"' % one_server for one_server in server]
-        server = ' AND servercode in (%s)' % ','.join(server_list)
+        where_server = ' AND a.servercode IN (%s)' % ','.join(server_list)
     else:
-        server = ''
-    after_table = 'WHERE gamecode="%s" AND (create_time BETWEEN %s AND %s) AND status IN (1,4)%s' % (
-        game_code, timezone_format % start, timezone_format % end, server)
+        where_server = ''
+
+    # 查询条件
+    after_table = 'WHERE a.gamecode="%s" AND (a.create_time BETWEEN %s AND %s) AND a.status IN (1,4)%s' % (
+        game_code, timezone_format % start, timezone_format % end, where_server)
 
     # 构造字典并返回
-    request_dict = {'way': way, 'db_name': db_name, 'table': table, 'columns': columns, 'after_table': after_table,
-                    'meta': meta}
+    request_dict = {'way': way, 'meta': meta, 'db_name': db_name, 'table': table, 'columns': columns,
+                    'after_table': after_table}
     return request_dict
 
 
