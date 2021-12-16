@@ -84,6 +84,7 @@ class Downloader(object):
         """
 
         # 根据db_type，获取对应数据库数据
+        # 如db_type为“else”，则直接执行对应数据库对象的execute方法
         db_type = kwargs.get('db_type', 'mysql')
         db_object = kwargs.get('db_object')  # 传入一个数据库对象则使用该数据库
         db_name = kwargs.get('db_name')  # 传入一个name则使用配置数据库，前提是不传入db_object
@@ -102,6 +103,8 @@ class Downloader(object):
                 result = clickhouse_db.select(**kwargs)
             else:
                 result = clickhouse_db.execute(**kwargs)
+        elif db_type == 'else':
+            result = db_object.execute(**kwargs)
         else:
             raise ParameterError('db_type', ['mysql', 'redis', 'clickhouse'])
 
