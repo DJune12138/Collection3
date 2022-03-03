@@ -5,6 +5,7 @@ SQLServer数据库连接池
 
 import pymssql
 from DBUtils.PooledDB import PooledDB
+from utils import common_function as cf
 
 
 class SQLServerError(Exception):
@@ -103,10 +104,11 @@ class SQLServer(object):
         self.__pool = PooledDB(creator=pymssql, host=host, user=user, password=password, database=database,
                                charset=charset, as_dict=True, autocommit=True)
 
-    def execute(self, sql, **kwargs):
+    def execute(self, sql, debug=False, **kwargs):
         """
         执行SQL语句
         :param sql:(type=str) 要执行的SQL语句
+        :param debug:(type=bool) 是否打印SQL语句以供调试，默认False则不打印
         :param kwargs:(type=dict) 额外的关键字参数，主要用于防止传入过多参数报错
         :return result:(type=list,None) 如果是SELECT语句则返回查询数据，否则返回None
         """
@@ -121,6 +123,8 @@ class SQLServer(object):
 
         # 2.执行SQL
         # 该对象固定auto_commit为True，连接池会自动提交事务
+        if debug:
+            cf.print_log(sql)
         try:
             cursor.execute(sql)
         except Exception as e:

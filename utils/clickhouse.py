@@ -136,7 +136,7 @@ class ClickHouse(object):
         else:
             cls.__filter_container.add(fp)
 
-    def execute(self, sql, params=None, **kwargs):
+    def execute(self, sql, params=None, debug=False, **kwargs):
         """
         执行SQL语句，常规增删改查可使用对应方法，自编写语句可直接使用此方法
         1.关于使用params参数，参考格式为[[v1, v2, ...]]，里面的数据需要根据数据表转成对应类型
@@ -144,23 +144,27 @@ class ClickHouse(object):
         3.详情可参考 https://github.com/mymarilyn/clickhouse-driver
         :param sql:(type=str) 要执行的SQL语句，一般用于执行常规增删改查之外的语句
         :param params:(type=tuple,list,dict) 类似自动拼接SQL字符串并处理一些特殊符号的功能，默认None则不使用
+        :param debug:(type=bool) 是否打印SQL语句以供调试，默认False则不打印
         :param kwargs:(type=dict) 额外的关键字参数，主要用于防止传入过多参数报错
         :return result:(type=list,int) 执行结果，params不为None的INSERT语句则返回插入数据条数
         """
 
         with self.__pool.get_client() as pool:
+            if debug:
+                cf.print_log(sql)
             try:
                 result = pool.execute(sql, params=params)
             except Exception as e:
                 raise ExecuteError(sql, params, e)
         return result
 
-    def select(self, table, columns=None, after_table='', **kwargs):
+    def select(self, table, columns=None, after_table='', debug=False, **kwargs):
         """
         拼接常规SELECT语句并执行，返回查询结果
         :param table:(type=str) 要查询数据的表名
         :param columns:(type=list) 要查询的字段，默认查所有字段
         :param after_table:(type=str) 表名后的语句，where、group by等，自由发挥，请自行遵守语法，默认为空
+        :param debug:(type=bool) 是否打印SQL语句以供调试，默认False则不打印
         :param kwargs:(type=dict) 额外的关键字参数，主要用于防止传入过多参数报错
         :return result:(type=list) 查询结果，每条数据为一个元组
         """
@@ -182,15 +186,16 @@ class ClickHouse(object):
                  after_table)
 
         # 执行并返回查询结果
-        result = self.execute(sql)
+        result = self.execute(sql, debug=debug)
         return result
 
-    def insert(self, table, params, columns=None, **kwargs):
+    def insert(self, table, params, columns=None, debug=False, **kwargs):
         """
         拼接常规INSERT语句并执行
         :param table:(type=str) 要插入数据的表名
         :param params:(type=tuple,list,dict) 要插入的数据，详见execute函数的说明
         :param columns:(type=list) 需要插入数据的字段，默认所有字段，["column1", "column2", "column3", ...]
+        :param debug:(type=bool) 是否打印SQL语句以供调试，默认False则不打印
         :param kwargs:(type=dict) 额外的关键字参数，主要用于防止传入过多参数报错
         :return result:(type=int) 执行结果，受影响行数
         """
@@ -211,5 +216,5 @@ class ClickHouse(object):
                  columns)
 
         # 执行并返回插入数据条数
-        result = self.execute(sql, params=params)
+        result = self.execute(sql, params=params, debug=debug)
         return result

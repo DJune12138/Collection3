@@ -26,6 +26,9 @@ class Downloader(object):
         self.web_lock = dict()  # 存储线程锁
         self.web_first = set()  # 存储“首跳”
 
+        # db方法防死锁用
+        self.db_lock = dict()
+
     def __web(self, kwargs):
         """
         发起网络请求，获取响应数据
@@ -71,14 +74,14 @@ class Downloader(object):
             raise ParameterError('web_type', ['“json”（解析为json字符串）', '“response”（返回原生响应对象）', '“xpath”（解析为Element对象）'])
         return response
 
-    @staticmethod
-    def __db(kwargs):
+    def __db(self, kwargs):
         """
         获取数据库数据
         1.下载信息里，db_type为数据库类型，默认使用MySQL
         2.db_name对应account模块里对应数据库连接信息的json字符串的key
         3.当db_type为redis时，redis_get为获取数据的方式，默认get
         3.其余可选参数请查看工具包对应函数
+        4.带上“db_limit”参数并且为str类型，则开启防死锁功能
         :param kwargs:(type=dict) 下载信息
         :return result:(type=list,dict) 查询结果
         """
@@ -88,23 +91,41 @@ class Downloader(object):
         db_type = kwargs.get('db_type', 'mysql')
         db_object = kwargs.get('db_object')  # 传入一个数据库对象则使用该数据库
         db_name = kwargs.get('db_name')  # 传入一个name则使用配置数据库，前提是不传入db_object
+        db_limit = kwargs.get('db_limit')
+        lock = self.db_lock.setdefault(db_limit, Lock()) if isinstance(db_limit, str) else None
         if db_type == 'mysql':
             mysql_db = mysql[db_name] if db_object is None else db_object
             if kwargs.get('sql') is None:  # 根据有没有SQL语句，决定用什么函数
                 result = mysql_db.select(**kwargs)
             else:
-                result = mysql_db.execute(**kwargs)
+                if lock is not None:
+                    with lock:
+                        result = mysql_db.execute(**kwargs)
+                else:
+                    result = mysql_db.execute(**kwargs)
         elif db_type == 'redis':
             redis_db = redis[db_name] if db_object is None else db_object
-            result = getattr(redis_db, kwargs.get('redis_get', 'get'))(**kwargs)
+            if lock is not None:
+                with lock:
+                    result = getattr(redis_db, kwargs.get('redis_get', 'get'))(**kwargs)
+            else:
+                result = getattr(redis_db, kwargs.get('redis_get', 'get'))(**kwargs)
         elif db_type == 'clickhouse':
             clickhouse_db = clickhouse[db_name] if db_object is None else db_object
             if kwargs.get('sql') is None:
                 result = clickhouse_db.select(**kwargs)
             else:
-                result = clickhouse_db.execute(**kwargs)
+                if lock is not None:
+                    with lock:
+                        result = clickhouse_db.execute(**kwargs)
+                else:
+                    result = clickhouse_db.execute(**kwargs)
         elif db_type == 'else':
-            result = db_object.execute(**kwargs)
+            if lock is not None:
+                with lock:
+                    result = db_object.execute(**kwargs)
+            else:
+                result = db_object.execute(**kwargs)
         else:
             raise ParameterError('db_type', ['mysql', 'redis', 'clickhouse'])
 

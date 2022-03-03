@@ -175,12 +175,13 @@ class MySQL(object):
         value = str(value).replace('"', '""').replace('\\', r'\\')
         return value
 
-    def execute(self, sql, args=None, fetchall=True, **kwargs):
+    def execute(self, sql, args=None, fetchall=True, debug=False, **kwargs):
         """
         执行SQL语句，常规增删改查可使用对应方法，自编写语句可直接使用此方法
         :param sql:(type=str) 要执行的SQL语句，一般用于执行常规增删改查之外的语句
         :param args:(type=tuple,list,dict) pymysql自带args，类似自动拼接SQL字符串并处理一些特殊符号的功能，默认None则不使用
         :param fetchall:(type=bool) 仅SELECT语句有效，是否返回查到的所有数据，True返回所有，False返回第一条，默认返回所有
+        :param debug:(type=bool) 是否打印SQL语句以供调试，默认False则不打印
         :param kwargs:(type=dict) 额外的关键字参数，主要用于防止传入过多参数报错
         :return result:(type=list,dict,int) 执行结果，如果是SELECT语句则根据fetchall返回多条或单条数据，其他语句则返回受影响行数
         """
@@ -195,6 +196,8 @@ class MySQL(object):
 
         # 2.执行SQL
         # 该对象固定auto_commit为True，连接池会自动提交事务
+        if debug:
+            cf.print_log(sql)
         try:
             result = cursor.execute(sql, args=args)
         except Exception as e:
@@ -211,13 +214,14 @@ class MySQL(object):
         # 5.返回执行结果
         return result
 
-    def select(self, table, columns=None, after_table='', fetchall=True, **kwargs):
+    def select(self, table, columns=None, after_table='', fetchall=True, debug=False, **kwargs):
         """
         拼接常规SELECT语句并执行，返回查询结果
         :param table:(type=str) 要查询数据的表名
         :param columns:(type=list) 要查询的字段，默认查所有字段
         :param after_table:(type=str) 表名后的语句，where、group by等，自由发挥，请自行遵守语法，默认为空
         :param fetchall:(type=bool) 是否返回查到的所有数据，True为是并返回一个列表，False则只返回第一条数据，默认返回所有
+        :param debug:(type=bool) 是否打印SQL语句以供调试，默认False则不打印
         :param kwargs:(type=dict) 额外的关键字参数，主要用于防止传入过多参数报错
         :return result:(type=list,dict) 查询结果，根据fetchall返回多条数据或单条数据
         """
@@ -239,11 +243,11 @@ class MySQL(object):
                  after_table)
 
         # 执行并返回查询结果
-        result = self.execute(sql, fetchall=fetchall)
+        result = self.execute(sql, fetchall=fetchall, debug=debug)
         return result
 
     def insert(self, table, values, columns=None, duplicates=None, ignore=False, dup_ac=False, limit_line=None,
-               **kwargs):
+               debug=False, **kwargs):
         """
         拼接常规INSERT语句并执行
         :param table:(type=str) 要插入数据的表名
@@ -253,6 +257,7 @@ class MySQL(object):
         :param ignore:(type=bool) 唯一键冲突则忽略，默认False；如果duplicates不为None，则ignore强制为False
         :param dup_ac:(type=bool) 适配自动采集流程用，会判断更新冲突数据，duplicates不为None才有效，默认False不启用
         :param limit_line:(type=int) 在插入多条数据时可启用，避免一次插入过多数据，每次分批插入几条，默认None则不启用
+        :param debug:(type=bool) 是否打印SQL语句以供调试，默认False则不打印
         :param kwargs:(type=dict) 额外的关键字参数，主要用于防止传入过多参数报错
         :return result:(type=int) 执行结果，受影响行数
         """
@@ -320,5 +325,5 @@ class MySQL(object):
                  duplicates_sql)
 
         # 执行并返回受影响行数
-        result = self.execute(sql)
+        result = self.execute(sql, debug=debug)
         return result

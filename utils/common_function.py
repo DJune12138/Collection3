@@ -257,30 +257,26 @@ def timestamp_format(timestamp, format_=format_datetime_n, time_type='lt'):
     return format_str
 
 
-def change_timezone(dt_str, t_timezone, l_timezone='Asia/Shanghai', time_format=format_datetime_n):
+def change_timezone(change, t_timezone, l_timezone='Asia/Shanghai', time_format=format_datetime_n, use_obj=False):
     """
     把一个时区的时间转去另外一个时区的时间
-    :param dt_str:(type=str) 要转换的时间字符串
-    :param t_timezone:(type=str) 目标时区
-    :param l_timezone:(type=str) 本地时区，默认东八区（Asia/Shanghai）
-    :param time_format:(type=str) 要转换的时间字符串格式，默认“%Y-%m-%d %H:%M:%S”
-    :return t_dt_str:(type=str) 转换的结果，时间字符串格式为“%Y-%m-%d %H:%M:%S”
+    :param change:(type=str,datetime) 要转换的时间字符串，如use_obj=True则为datetime对象
+    :param t_timezone:(type=str) 目标时区，具体写法参照pytz.timezone说明，下同
+    :param l_timezone:(type=str) 本地时区，默认东八区
+    :param time_format:(type=str) 要转换的时间字符串格式，默认“%Y-%m-%d %H:%M:%S”，只在use_obj=False有作用
+    :param use_obj:(type=bool) 输入和输出是否使用datetime对象，默认False不使用对象则为字符串
+    :return target_tz:(type=str,datetime) 转换的结果，默认根据time_format格式返回字符串，如use_obj=True则为datetime对象
     """
 
-    # 本地时区
-    local_tz = pytz.timezone(l_timezone)
+    # 时区
+    local_tz = pytz.timezone(l_timezone)  # 本地
+    target_tz = pytz.timezone(t_timezone)  # 目标
 
-    # 目标时区
-    target_tz = pytz.timezone(t_timezone)
+    # 实例化本地时区
+    dt_obj = datetime.datetime.strptime(change, time_format) if not use_obj else change
+    local_obj = local_tz.localize(dt_obj)
 
-    # 将时间转换成datetime元组
-    dt = datetime.datetime.strptime(dt_str, time_format)
-
-    # 将datetime转换成本地时区时间
-    dt = local_tz.localize(dt)
-
-    # 将本地时间转换成目标时区UTC时间
-    t_dt_str = str(dt.astimezone(tz=target_tz))[0:19]
-
-    # 返回结果
-    return t_dt_str
+    # 转换成目标时区
+    dt_obj = local_obj.astimezone(tz=target_tz)
+    target_tz = dt_obj.strftime(time_format) if not use_obj else dt_obj
+    return target_tz

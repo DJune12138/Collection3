@@ -329,30 +329,3 @@ def get_argv(argv_key, transform=False):
     else:
         raise CheckUnPass('“argv_key”只能为str类型（单个）或list、tuple类型（多个）！')
     return result
-
-
-def old_analyse(platform, game_code):
-    """
-    构建游戏数据采集生成旧报表的shell命令
-    :param platform:(type=str,None) 游戏所属平台，传入None则不构建
-    :param game_code:(type=str,None) 游戏代码，传入None则不构建
-    :return result:(type=dict,None) 构建shell命令的结果
-    """
-
-    result = None
-    if services.argv.pass_something == 't' or platform is None or game_code is None:  # 传参-pt则不构建
-        cf.print_log('跳过生成旧报表！')
-        return result
-    db_mapping = {'jq': 'demon', 'cx': 'egame_om', 'hy': 'egame_slg'}
-    start, end = time_quantum()
-    s, e = services.argv.start_time, services.argv.end_time
-    if s is not None and e is not None and s.endswith('0000') and e.endswith('0000'):
-        shell = '/usr/bin/python NewOperaData.py -b%s -g%s -d%s,%s -rn -py' % (
-            db_mapping[platform], game_code, start.strftime(format_date), end.strftime(format_date))
-    else:
-        shell = '/usr/bin/python NewOperaData.py -b%s -g%s -d%s,%s -r%s,%s -py' % (
-            db_mapping[platform], game_code, start.strftime(format_date), end.strftime(format_date),
-            start.strftime(format_datetime), end.strftime(format_datetime))
-    cf.print_log('执行报表！shell命令：%s' % shell)
-    result = {'way': 'shell', 'parse': '_funny', 'cwd': '/data/shell/lib', 'shell': shell, 'check': False}
-    return result

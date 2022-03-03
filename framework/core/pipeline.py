@@ -3,9 +3,10 @@
 1.负责处理数据对象
 """
 
+from threading import Lock
 from framework.object.request import Request
 from framework.error.check_error import ParameterError
-from services import mysql, redis, clickhouse, logger
+from services import mysql, redis, clickhouse
 from utils import common_profession as cp
 from utils import common_function as cf
 from utils.mysql import ExecuteError as mysql_exe
@@ -16,6 +17,18 @@ class Pipeline(object):
     """
     管道组件
     """
+
+    def __init__(self):
+        """
+        初始化管道
+        1.如果使用默认管道（即业务里没有继承重写），则相关功能可正常使用
+        2.如果业务需要继承重写管道，应避免重写__init__方法，否则可能导致相关功能报错！
+        3.如果继承重写管道后必须要重写__init__方法，建议开头使用“super().__init__()”加载初始化方法，相关功能亦可正常使用
+        """
+
+        # 数据库插入数据时防止死锁
+        # 存储线程锁
+        self.insert_lock = dict()
 
     def _funny(self, item):
         """
@@ -111,22 +124,28 @@ class Pipeline(object):
         request = Request(*args, **kwargs)
         return request
 
-    @staticmethod
-    def into_db(data):
+    def into_db(self, data):
         """
         入库的通用接口
         1.db_type指定数据库类型
         2.db_name指定关键字映射的数据库对象
         3.其余参数参考工具包
+        4.在插入数据时，带上“insert_limit”参数并且为str类型，则开启防死锁功能
         :param data:(type=dict) 解析后，准备入库的数据
         """
 
         db_type = data.get('db_type', 'mysql')
         db_name = data.get('db_name')
+        insert_limit = data.get('insert_limit')
+        lock = self.insert_lock.setdefault(insert_limit, Lock()) if isinstance(insert_limit, str) else None
         if db_type == 'mysql':
             mysql_db = mysql[db_name]
             try:
-                mysql_db.insert(**data)
+                if lock is not None:
+                    with lock:
+                        mysql_db.insert(**data)
+                else:
+                    mysql_db.insert(**data)
             except mysql_exe as e:
                 if 'Lock wait timeout exceeded' in str(e):  # 多线程引发的唯一键冲突，有一定概率发生，暂没有好办法避免
                     cf.print_log('多线程下概率引发的唯一键冲突！')
@@ -134,11 +153,19 @@ class Pipeline(object):
                     raise e
         elif db_type == 'redis':
             redis_db = redis[db_name]
-            getattr(redis_db, data.get('redis_set', 'set'))(**data)
+            if lock is not None:
+                with lock:
+                    getattr(redis_db, data.get('redis_set', 'set'))(**data)
+            else:
+                getattr(redis_db, data.get('redis_set', 'set'))(**data)
         elif db_type == 'clickhouse':
             clickhouse_db = clickhouse[db_name]
             try:
-                clickhouse_db.insert(**data)
+                if lock is not None:
+                    with lock:
+                        clickhouse_db.insert(**data)
+                else:
+                    clickhouse_db.insert(**data)
             except clickhouse_exe as e:
                 if 'most likely due to a circular import' in str(e):  # clickhouse_driver源代码未知错误，暂无法解决
                     cf.print_log('clickhouse_driver源代码未知错误！')  # 预估问题和clickhouse的ReplacingMergeTree引擎有关
