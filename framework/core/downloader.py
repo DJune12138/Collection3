@@ -168,6 +168,25 @@ class Downloader(object):
         result = result[lines - 1:]  # Tips：py索引从0开始，文件行数对应减1
         return result
 
+    @staticmethod
+    def __sdk(kwargs):
+        """
+        调用SDK获取数据
+        1.sdk_fun为函数引用，必传
+        2.sdk_args为调用函数时的位置参数，使用tuple，不传默认为空元组
+        3.sdk_kwargs为调用函数时的关键字参数，使用dict，不传默认为空字典
+        :param kwargs:(type=dict) 下载信息
+        :return result:(type=∞) SDK调用结果
+        """
+
+        sdk_fun = kwargs.get('sdk_fun')
+        if sdk_fun is None:
+            raise LackParameter(['sdk_fun'])
+        sdk_args = kwargs.get('sdk_args', tuple())
+        sdk_kwargs = kwargs.get('sdk_kwargs', dict())
+        result = sdk_fun(*sdk_args, **sdk_kwargs)
+        return result
+
     def get_response(self, request):
         """
         发起请求获取响应
@@ -186,11 +205,13 @@ class Downloader(object):
             data = self.__shell(kwargs)
         elif way == 'file':
             data = self.__file(kwargs)
+        elif way == 'sdk':
+            data = self.__sdk(kwargs)
         elif way == 'test':
             data = kwargs.get('test_data')
         else:
             raise ParameterError('way', ['“web”（获取网络数据）', '“db”（获取数据库数据）', '“shell”（执行shell命令并获取返回数据）',
-                                         '“file”（获取日志文件数据）'])
+                                         '“file”（获取日志文件数据）', '“sdk”（调用SDK获取数据）'])
 
         # 2.构建响应对象，并返回
         response = Response(data)

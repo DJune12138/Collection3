@@ -60,7 +60,7 @@ def calculate_fp(parameters, algorithms='sha1'):
     return fp
 
 
-def request_get_response(url, method='get', interval=0, retry_interval=1, timeout=15, retry=3, **kwargs):
+def request_get_response(url, method='get', interval=0, retry_interval=1, timeout=15, retry=1, **kwargs):
     """
     获取响应数据，重连失败抛IOError异常。
     :param url:(type=str) 请求地址
@@ -68,9 +68,9 @@ def request_get_response(url, method='get', interval=0, retry_interval=1, timeou
     :param interval:(type=int) 请求间隔时间（秒），默认0
     :param retry_interval:(type=int) 重连请求间隔时间（秒），默认1
     :param timeout:(type=int) 超时时间（秒），默认30
-    :param retry:(type=int) 重连次数，默认3
+    :param retry:(type=int) 请求次数，如超过1则会启用timeout重连，该数字应该大于等于1，默认1
     :param kwargs:(type=dict) 其余的关键字参数，用于接收请求头与请求体
-    :return response:(type=Response) 响应数据，如果多次尝试请求仍然失败，抛异常。
+    :return response:(type=Response) 响应数据，如果多次尝试请求仍然失败，抛异常
     """
 
     # 创建默认请求头与请求体
@@ -80,7 +80,7 @@ def request_get_response(url, method='get', interval=0, retry_interval=1, timeou
     })
     kwargs.setdefault('data', dict())
 
-    # 断线重连，重连次数达上限后抛异常
+    # 发起请求，重连次数达上限后抛异常
     for i in range(retry):
         time.sleep(interval)
         try:
