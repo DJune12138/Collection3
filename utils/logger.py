@@ -139,7 +139,7 @@ class Logger(object):
         """
         记录日志，并发送钉钉消息
         :param msg:(type=str) 报错消息
-        :param msg:(type=Exception) 错误对象
+        :param e:(type=Exception) 错误对象
         :param key:(type=str) 报错的额外标识，比如业务名称，默认空字符串
         :param group:(type=str) 要发送消息的群组，默认发去计划任务群组
         :param args:(type=tuple) 其余的执行日志器原生exception方法的参数

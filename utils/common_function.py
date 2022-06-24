@@ -11,6 +11,7 @@ import datetime
 import base64
 import subprocess
 import pytz
+import csv
 import services  # 该模块在加载服务前就已经被导入，只能导入总模块，否则所有服务都会是加载前的None
 from config import format_date, format_date_n, format_datetime_n
 
@@ -60,15 +61,14 @@ def calculate_fp(parameters, algorithms='sha1'):
     return fp
 
 
-def request_get_response(url, method='get', interval=0, retry_interval=1, timeout=15, retry=1, **kwargs):
+def request_get_response(url, method='get', retry=2, timeout=60, retry_interval=3, **kwargs):
     """
     获取响应数据，重连失败抛IOError异常。
     :param url:(type=str) 请求地址
     :param method:(type=str) 请求方式，get或post，默认get
-    :param interval:(type=int) 请求间隔时间（秒），默认0
-    :param retry_interval:(type=int) 重连请求间隔时间（秒），默认1
-    :param timeout:(type=int) 超时时间（秒），默认30
-    :param retry:(type=int) 请求次数，如超过1则会启用timeout重连，该数字应该大于等于1，默认1
+    :param retry:(type=int) 请求次数，该数字应该大于等于1，默认2，如超过1则会启用timeout重连
+    :param timeout:(type=int) 超时时间（秒），默认60
+    :param retry_interval:(type=int) 重连请求间隔时间（秒），默认3
     :param kwargs:(type=dict) 其余的关键字参数，用于接收请求头与请求体
     :return response:(type=Response) 响应数据，如果多次尝试请求仍然失败，抛异常
     """
@@ -81,8 +81,9 @@ def request_get_response(url, method='get', interval=0, retry_interval=1, timeou
     kwargs.setdefault('data', dict())
 
     # 发起请求，重连次数达上限后抛异常
+    if retry < 1:
+        raise ValueError('retry为大于等于1的数字！')
     for i in range(retry):
-        time.sleep(interval)
         try:
             if method.lower() == 'get':
                 response = requests.get(url, timeout=timeout, headers=kwargs['headers'])
@@ -280,3 +281,38 @@ def change_timezone(change, t_timezone, l_timezone='Asia/Shanghai', time_format=
     dt_obj = local_obj.astimezone(tz=target_tz)
     target_tz = dt_obj.strftime(time_format) if not use_obj else dt_obj
     return target_tz
+
+
+def analyze_csv(text):
+    """
+    解析csv格式的文本数据
+    :param text:(type=str) csv格式的文本数据
+    :return result:(type=list) 解析后的数据，每一个元素为标题为key对应数据为value的dict
+    """
+
+    # 处理特殊符号，并按照换行符分行
+    lines = text.replace('\0', '').split('\n')
+
+    # 转换成csv对象，并遍历处理数据
+    csv_data = csv.reader(lines)
+    title = None  # 记录标题（表头）
+    bad, such_as = 0, None  # 辅助记录不完整数据，便于排查
+    result = list()
+    for one in csv_data:
+        if one:
+            if title is None:
+                title = one
+                continue
+
+            # 完整数据则保存，不完整数据则记录
+            if len(title) == len(one):
+                result.append(dict(zip(title, one)))
+            else:
+                bad += 1
+                if such_as is None:
+                    such_as = one
+
+    # 返回完整数据，如有不完整数据则播报
+    if bad:
+        print_log('获取到的csv文本数据中有%s行数据不完整，其中一行数据如下：%s' % (bad, such_as))
+    return result

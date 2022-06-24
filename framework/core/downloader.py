@@ -52,7 +52,7 @@ class Downloader(object):
         if isinstance(web_limit, str):
             lock = self.web_lock.setdefault(web_limit, Lock())
             with lock:
-                limit_s = kwargs.get('limit_s', 0)
+                limit_s = kwargs.get('limit_s', 1)
                 if kwargs.get('first_pass', True):
                     if web_limit not in self.web_first:
                         self.web_first.add(web_limit)
@@ -61,8 +61,12 @@ class Downloader(object):
                 else:
                     sleep(limit_s)
 
-        # 发起请求，返回响应
-        # 根据web_type参数决定返回什么类型的数据：json返回json字符串（默认），response返回原生响应对象，xpath返回Element对象
+        # 发起请求，返回响应，根据web_type参数返回不同类型的数据：
+        # ① “json”返回解析json后的数据（默认）
+        # ② “response”返回原生响应对象
+        # ③ “xpath”返回Element对象
+        # ④ “text”返回响应体文本str
+        # ⑤ “csv”返回解析csv后的数据
         web_type = kwargs.get('web_type', 'json')
         if web_type == 'json':
             response = cf.repetition_json(**kwargs)
@@ -70,8 +74,13 @@ class Downloader(object):
             response = cf.request_get_response(**kwargs)
         elif web_type == 'xpath':
             response = etree.HTML(cf.request_get_response(**kwargs).text)
+        elif web_type == 'text':
+            response = cf.request_get_response(**kwargs).text
+        elif web_type == 'csv':
+            response = cf.analyze_csv(cf.request_get_response(**kwargs).text)
         else:
-            raise ParameterError('web_type', ['“json”（解析为json字符串）', '“response”（返回原生响应对象）', '“xpath”（解析为Element对象）'])
+            raise ParameterError('web_type', ['“json”（解析json后的数据）', '“response”（原生响应对象）', '“xpath”（Element对象）',
+                                              '“text”（响应体文本str）', '“csv”（解析csv后的数据）'])
         return response
 
     def __db(self, kwargs):
