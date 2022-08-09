@@ -9,6 +9,7 @@ from utils.logger import Logger
 from utils.mysql import MySQL, RepetitiveConnect as mysql_repetitive
 from utils.redis import Redis, RepetitiveConnect as redis_repetitive
 from utils.clickhouse import ClickHouse, RepetitiveConnect as clickhouse_repetitive
+from utils.postgresql import PostgreSQL, RepetitiveConnect as postgresql_repetitive
 
 
 def __get_argv():
@@ -119,6 +120,22 @@ def __get_clickhouse():
                 services.logger.exception('ClickHouse数据库（%s）重复连接！' % name)
 
 
+def __get_postgresql():
+    """
+    加载PostgreSQL数据库连接池
+    """
+
+    if services.postgresql is None:
+        services.postgresql = dict()
+        with open('%s/postgresql.json' % account_name, 'r') as f:
+            postgresql_account = json.load(f)
+        for name, info in postgresql_account.items():
+            try:
+                services.postgresql[name] = PostgreSQL(**info)
+            except postgresql_repetitive:
+                services.logger.exception('PostgreSQL数据库（%s）重复连接！' % name)
+
+
 def load():
     """
     加载所有服务
@@ -130,3 +147,4 @@ def load():
     __get_logger()
     __get_mysql()
     __get_clickhouse()
+    __get_postgresql()

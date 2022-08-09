@@ -136,7 +136,7 @@ logger_config = {
 dk_plan = 'plan'  # plan的key
 dk_live = 'live'
 ding_token = {
-    dk_plan: '551f99239793cc8490769a4325abbed0243114f26cfc06e67664ad30abbac839',  # 计划任务
+    dk_plan: 'facaf0e73f3eb3d7536a0caed2c3001d073f33fc4fb3e9b8be8adfedcc6bc15d',  # 计划任务
     dk_live: 'fa66808a722dd7b2a147d47cc13a6d8e9db71b9d01ff2e613f2005c3cd30d881'  # 直播后台
 }
 ding_is_send = factory_config[factory_code]['ding_is_send']

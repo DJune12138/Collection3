@@ -530,7 +530,7 @@ class Builder(object):
         cf.print_log('准备生成旧版报表...')
 
         # 查询SQL语句模板
-        online_sql_realtime = """SELECT a.gamecode,b.gamename,a.servercode,a.online_count num
+        online_sql_realtime = """SELECT a.gamecode,b.gamename,a.servercode,a.online_count AS num
         FROM oper_game_online a LEFT JOIN game_group b ON a.gamecode=b.gamecode
         WHERE a.gamecode="%s" AND a.online_time="{}";""" % game_code  # 实时报表在线，查明细
         online_sql_day = """SELECT a.gamecode,b.gamename,a.servercode,MAX(a.online_count) AS num

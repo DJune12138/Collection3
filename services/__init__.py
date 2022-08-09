@@ -19,3 +19,6 @@ mysql = None
 
 # ClickHouse数据库连接池
 clickhouse = None
+
+# PostgreSQL数据库连接池
+postgresql = None

@@ -189,24 +189,38 @@ class ClickHouse(object):
         result = self.execute(sql, debug=debug)
         return result
 
-    def insert(self, table, params, columns=None, debug=False, **kwargs):
+    def insert(self, table, params, columns=None, limit_line=None, debug=False, **kwargs):
         """
         拼接常规INSERT语句并执行
         :param table:(type=str) 要插入数据的表名
         :param params:(type=tuple,list,dict) 要插入的数据，详见execute函数的说明
         :param columns:(type=list) 需要插入数据的字段，默认所有字段，["column1", "column2", "column3", ...]
+        :param limit_line:(type=int) 分批插入的条数，分批插入数据以避免一次插入过多数据，默认None则不启用
         :param debug:(type=bool) 是否打印SQL语句以供调试，默认False则不打印
         :param kwargs:(type=dict) 额外的关键字参数，主要用于防止传入过多参数报错
         :return result:(type=int) 执行结果，受影响行数
         """
 
         # 拼接字段
+        source_columns = columns  # 分批插入时使用
         if columns is not None:
             if not isinstance(columns, list):
                 raise ClickHouseError('columns参数类型应该为list！')
             columns = '(%s)' % ','.join(columns)
         else:
             columns = ''
+
+        # 分批插入
+        if limit_line:
+            source_params = params  # 源数据另外保存
+            params = source_params[:limit_line]  # 第一批
+            len_params = len(source_params)
+            i_range = int(len_params / limit_line if not len_params % limit_line else len_params / limit_line + 1)
+            for i in range(i_range):
+                if i == 0:
+                    continue  # 第一批直接交由本次函数插入
+                i_params = source_params[i * limit_line: (i + 1) * limit_line]
+                self.insert(table, i_params, columns=source_columns, debug=debug)  # 后续多次调用insert方法实现分批插入
 
         # 构造SQL
         sql = """INSERT INTO %s

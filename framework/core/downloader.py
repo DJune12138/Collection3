@@ -9,7 +9,7 @@ from lxml import etree
 from framework.object.response import Response
 from framework.error.check_error import ParameterError, LackParameter, CheckUnPass
 from utils import common_function as cf
-from services import mysql, redis, clickhouse
+from services import mysql, redis, clickhouse, postgresql
 
 
 class Downloader(object):
@@ -129,6 +129,13 @@ class Downloader(object):
                         result = clickhouse_db.execute(**kwargs)
                 else:
                     result = clickhouse_db.execute(**kwargs)
+        elif db_type == 'postgresql':
+            postgresql_db = postgresql[db_name] if db_object is None else db_object
+            if lock is not None:
+                with lock:
+                    result = postgresql_db.execute(**kwargs)
+            else:
+                result = postgresql_db.execute(**kwargs)
         elif db_type == 'else':
             if lock is not None:
                 with lock:
@@ -136,7 +143,7 @@ class Downloader(object):
             else:
                 result = db_object.execute(**kwargs)
         else:
-            raise ParameterError('db_type', ['mysql', 'redis', 'clickhouse'])
+            raise ParameterError('db_type', ['mysql', 'redis', 'clickhouse', 'postgresql'])
 
         # 返回数据
         return result

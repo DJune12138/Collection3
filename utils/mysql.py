@@ -285,13 +285,14 @@ class MySQL(object):
                                        for one_data in values])
             else:  # 分批插入
                 values_sql = ','.join(['(%s)' % ','.join(['"%s"' % self.__replace_value(value) for value in one_data])
-                                       for one_data in values[:limit_line]])
-                for i in range(int(values_len / limit_line if not values_len % limit_line
-                                   else values_len / limit_line + 1)):
+                                       for one_data in values[:limit_line]])  # 第一批
+                i_range = int(values_len / limit_line if not values_len % limit_line else values_len / limit_line + 1)
+                for i in range(i_range):
                     if i == 0:
                         continue  # 第一批直接交由本次函数插入
-                    self.insert(table, values[i * limit_line: (i + 1) * limit_line], columns=columns,
-                                duplicates=duplicates, ignore=ignore, dup_ac=dup_ac)  # 后续多次调用insert方法实现分批插入
+                    i_values = values[i * limit_line: (i + 1) * limit_line]
+                    self.insert(table, i_values, columns=columns, duplicates=duplicates, ignore=ignore, dup_ac=dup_ac,
+                                debug=debug)  # 后续多次调用insert方法实现分批插入
         else:  # 插入单条数据
             values_sql = '(%s)' % ','.join(['"%s"' % self.__replace_value(value) for value in values])
 
