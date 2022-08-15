@@ -9,6 +9,7 @@ from lxml import etree
 from framework.object.response import Response
 from framework.error.check_error import ParameterError, LackParameter, CheckUnPass
 from utils import common_function as cf
+from utils.mongodb import mongodb_operation
 from services import mysql, redis, clickhouse, postgresql
 
 
@@ -136,6 +137,9 @@ class Downloader(object):
                     result = postgresql_db.execute(**kwargs)
             else:
                 result = postgresql_db.execute(**kwargs)
+        elif db_type == 'mongodb':
+            mg_args = kwargs.get('mg_args', tuple())  # 操作MongoDB的指令列表，详见mongodb_operation函数注释
+            result = mongodb_operation(db_object, *mg_args)  # 直接使用mongodb对象
         elif db_type == 'else':
             if lock is not None:
                 with lock:
@@ -143,7 +147,7 @@ class Downloader(object):
             else:
                 result = db_object.execute(**kwargs)
         else:
-            raise ParameterError('db_type', ['mysql', 'redis', 'clickhouse', 'postgresql'])
+            raise ParameterError('db_type', ['mysql', 'redis', 'clickhouse', 'postgresql', 'mongodb'])
 
         # 返回数据
         return result
@@ -191,16 +195,38 @@ class Downloader(object):
         1.sdk_fun为函数引用，必传
         2.sdk_args为调用函数时的位置参数，使用tuple，不传默认为空元组
         3.sdk_kwargs为调用函数时的关键字参数，使用dict，不传默认为空字典
+        4.sdk_chained为链式调用，默认None则不启用，启用写法参照下方注释
         :param kwargs:(type=dict) 下载信息
         :return result:(type=∞) SDK调用结果
         """
 
+        # 获取传参与调用SDK
         sdk_fun = kwargs.get('sdk_fun')
         if sdk_fun is None:
             raise LackParameter(['sdk_fun'])
         sdk_args = kwargs.get('sdk_args', tuple())
         sdk_kwargs = kwargs.get('sdk_kwargs', dict())
         result = sdk_fun(*sdk_args, **sdk_kwargs)
+
+        # 链式调用
+        # 该参数为list或tuple，里面的元素为dict，有以下键值：
+        # 1.sdk_fun必选，为字符串对象，是调用函数名
+        # 2.run可选，布尔值，默认True，True则执行函数，否则等效于获取属性
+        # 3.sdk_args可选，与上方一致
+        # 4.sdk_kwargs可选，与上方一致
+        # 示例：fun1().fun2.fun3(1,b=2) ↓
+        # [{"sdk_fun":"fun1"},{"sdk_fun":"fun2","run":False},{"sdk_fun":"fun3","sdk_args":(1,),"sdk_kwargs":{"b":2}}]
+        sdk_chained = kwargs.get('sdk_chained')
+        if sdk_chained:
+            for one in sdk_chained:
+                sdk_fun = one['sdk_fun']  # 方法名
+                run = one.get('run', True)  # 是否需要执行的标记（执行即带括号）
+                if run:
+                    sdk_args = one.get('sdk_args', tuple())  # 位置参数
+                    sdk_kwargs = one.get('sdk_kwargs', dict())  # 关键字参数
+                    result = getattr(result, sdk_fun)(*sdk_args, **sdk_kwargs)
+                else:
+                    result = getattr(result, sdk_fun)
         return result
 
     def get_response(self, request):

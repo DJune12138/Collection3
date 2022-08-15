@@ -450,3 +450,13 @@ V1.11.3
     2.引擎初始化加载添加PostgreSQL数据库连接池服务
     3.下载器添加PostgreSQL数据库使用接口
     4.cliclhouse数据库新增limit_line参数，插入数据时可启用分批插入功能
+
+
+
+V1.11.4
+发布日期：2022-08-15
+简述：新增MongoDB数据库相关功能。
+新增：
+    1.工具包utils增加mongodb模块，用于连接与操作MongoDB
+    2.下载器添加MongoDB数据库使用接口
+    3.下载器SDK接口增加链式调用功能
