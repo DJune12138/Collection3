@@ -61,7 +61,7 @@ def calculate_fp(parameters, algorithms='sha1'):
     return fp
 
 
-def request_get_response(url, method='get', retry=2, timeout=60, retry_interval=3, **kwargs):
+def request_get_response(url, method='get', retry=2, timeout=60, retry_interval=3, verify=True, **kwargs):
     """
     获取响应数据，重连失败抛IOError异常。
     :param url:(type=str) 请求地址
@@ -69,6 +69,7 @@ def request_get_response(url, method='get', retry=2, timeout=60, retry_interval=
     :param retry:(type=int) 请求次数，该数字应该大于等于1，默认2，如超过1则会启用timeout重连
     :param timeout:(type=int) 超时时间（秒），默认60
     :param retry_interval:(type=int) 重连请求间隔时间（秒），默认3
+    :param verify:(type=bool) 是否进行证书验证，默认True
     :param kwargs:(type=dict) 其余的关键字参数，用于接收请求头与请求体
     :return response:(type=Response) 响应数据，如果多次尝试请求仍然失败，抛异常
     """
@@ -86,14 +87,15 @@ def request_get_response(url, method='get', retry=2, timeout=60, retry_interval=
     for i in range(retry):
         try:
             if method.lower() == 'get':
-                response = requests.get(url, timeout=timeout, headers=kwargs['headers'])
+                response = requests.get(url, timeout=timeout, headers=kwargs['headers'], verify=verify)
             elif method.lower() == 'post':
                 files = kwargs.get('files')
                 if files is None:
-                    response = requests.post(url, timeout=timeout, headers=kwargs['headers'], data=kwargs['data'])
+                    response = requests.post(url, timeout=timeout, headers=kwargs['headers'], data=kwargs['data'],
+                                             verify=verify)
                 else:
                     response = requests.post(url, timeout=timeout, headers=kwargs['headers'], data=kwargs['data'],
-                                             files=files)
+                                             files=files, verify=verify)
             else:
                 raise ValueError('method只能为"get"或"post"！')
         except requests.exceptions.RequestException as e:

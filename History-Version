@@ -460,3 +460,4 @@ V1.11.4
     1.工具包utils增加mongodb模块，用于连接与操作MongoDB
     2.下载器添加MongoDB数据库使用接口
     3.下载器SDK接口增加链式调用功能
+    4.非业务公共函数request_get_response增加verify参数，识别是否启用网站证书验证
