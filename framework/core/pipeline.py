@@ -10,7 +10,6 @@ from services import mysql, redis, clickhouse
 from utils import common_profession as cp
 from utils import common_function as cf
 from utils.mysql import ExecuteError as mysql_exe
-from utils.clickhouse import ExecuteError as clickhouse_exe
 
 
 class Pipeline(object):
@@ -160,16 +159,10 @@ class Pipeline(object):
                 getattr(redis_db, data.get('redis_set', 'set'))(**data)
         elif db_type == 'clickhouse':
             clickhouse_db = clickhouse[db_name]
-            try:
-                if lock is not None:
-                    with lock:
-                        clickhouse_db.insert(**data)
-                else:
+            if lock is not None:
+                with lock:
                     clickhouse_db.insert(**data)
-            except clickhouse_exe as e:
-                if 'most likely due to a circular import' in str(e):  # clickhouse_driver源代码未知错误，暂无法解决
-                    cf.print_log('clickhouse_driver源代码未知错误！')  # 预估问题和clickhouse的ReplacingMergeTree引擎有关
-                else:
-                    raise e
+            else:
+                clickhouse_db.insert(**data)
         else:
             raise ParameterError('db_type', ['mysql', 'redis', 'clickhouse'])

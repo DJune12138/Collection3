@@ -59,27 +59,3 @@ def mongodb_operation(pymongo_object, *args):
         else:
             result = getattr(result, key)()
     return result
-
-
-if __name__ == '__main__':
-    from datetime import datetime
-
-    c = {
-        "host": "43.129.188.246",
-        "port": 27017
-    }
-    aaa = MongoDB(**c).client['LogDB_DWC']['majiang_table_log']
-    # print(aaa)
-    # {'$gte': datetime.strptime('2022-08-12', '%Y-%m-%d')}
-    # r = aaa.find().limit(3)
-    # for i in r:
-    #     print(i)
-    # print(r)
-    r = aaa.find_one()
-    print(r)
-
-    # r = get_result(aaa, ['find'], ['limit', 3])
-    # r = mg_result(aaa, ['find', {'EndTime': {'$gte': datetime.strptime('2022-08-12', '%Y-%m-%d')}}], ['limit', 2])
-    # for i in r:
-    #     print(i)
-    # print(r)

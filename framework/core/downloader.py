@@ -91,7 +91,7 @@ class Downloader(object):
         2.db_name对应account模块里对应数据库连接信息的json字符串的key
         3.当db_type为redis时，redis_get为获取数据的方式，默认get
         3.其余可选参数请查看工具包对应函数
-        4.带上“db_limit”参数并且为str类型，则开启防死锁功能
+        4.带上“db_limit”参数并且为str类型，则开启防并发执行功能
         :param kwargs:(type=dict) 下载信息
         :return result:(type=list,dict) 查询结果
         """
@@ -106,13 +106,31 @@ class Downloader(object):
         if db_type == 'mysql':
             mysql_db = mysql[db_name] if db_object is None else db_object
             if kwargs.get('sql') is None:  # 根据有没有SQL语句，决定用什么函数
-                result = mysql_db.select(**kwargs)
+                if lock is not None:
+                    with lock:
+                        result = mysql_db.select(**kwargs)
+                else:
+                    result = mysql_db.select(**kwargs)
             else:
                 if lock is not None:
                     with lock:
                         result = mysql_db.execute(**kwargs)
                 else:
                     result = mysql_db.execute(**kwargs)
+        elif db_type == 'clickhouse':
+            clickhouse_db = clickhouse[db_name] if db_object is None else db_object
+            if kwargs.get('sql') is None:
+                if lock is not None:
+                    with lock:
+                        result = clickhouse_db.select(**kwargs)
+                else:
+                    result = clickhouse_db.select(**kwargs)
+            else:
+                if lock is not None:
+                    with lock:
+                        result = clickhouse_db.execute(**kwargs)
+                else:
+                    result = clickhouse_db.execute(**kwargs)
         elif db_type == 'redis':
             redis_db = redis[db_name] if db_object is None else db_object
             if lock is not None:
@@ -120,16 +138,6 @@ class Downloader(object):
                     result = getattr(redis_db, kwargs.get('redis_get', 'get'))(**kwargs)
             else:
                 result = getattr(redis_db, kwargs.get('redis_get', 'get'))(**kwargs)
-        elif db_type == 'clickhouse':
-            clickhouse_db = clickhouse[db_name] if db_object is None else db_object
-            if kwargs.get('sql') is None:
-                result = clickhouse_db.select(**kwargs)
-            else:
-                if lock is not None:
-                    with lock:
-                        result = clickhouse_db.execute(**kwargs)
-                else:
-                    result = clickhouse_db.execute(**kwargs)
         elif db_type == 'postgresql':
             postgresql_db = postgresql[db_name] if db_object is None else db_object
             if lock is not None:
@@ -147,7 +155,7 @@ class Downloader(object):
             else:
                 result = db_object.execute(**kwargs)
         else:
-            raise ParameterError('db_type', ['mysql', 'redis', 'clickhouse', 'postgresql', 'mongodb'])
+            raise ParameterError('db_type', ['mysql', 'clickhouse', 'redis', 'postgresql', 'mongodb'])
 
         # 返回数据
         return result
