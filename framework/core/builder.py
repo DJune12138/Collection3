@@ -387,21 +387,18 @@ class Builder(object):
             ④ device：设备，android、ios等
             ⑤ country：国家或地区代码，TW、KR、JP等
             ⑥ time：日期，兼容datetime类型
-            ⑦ spend：花费数据
+            ⑦ spend：花费数据（新台币）
         2.由于af_spend中的字段item需要映射配置获取国家名称，因此此方法有两个去向：
             ① 先获取redis有没有缓存，如有缓存则可以直接分析入库
             ② 如没有缓存，则先分析，再发起“country_code_name”请求，再入库
         :param response:(type=Response) 引擎回传的响应对象
         """
 
-        # 获取传输数据
-        platform = response.meta
-        source_data = response.data
-
-        # 分析数据
-        item_data = {'db_name': 'osa_%s' % platform, 'table': 'af_spend', 'values': None,
-                     'columns': ['gamecode', 'media', 'osa_name', 'device', 'country', 'time', 'item', 'spend'],
-                     'duplicates': ['spend']}
+        # 构造入库数据
+        platform, source_data = response.meta, response.data
+        columns = ['gamecode', 'media', 'osa_name', 'device', 'country', 'time', 'item', 'spend', 'spend_usd']
+        duplicates = ['spend', 'spend_usd']
+        item_data = {'db_name': 'osa_%s' % platform, 'table': 'af_spend', 'columns': columns, 'duplicates': duplicates}
         device = source_data['device'].lower()
         if device == 'android':
             device_name = '安卓'
@@ -415,8 +412,10 @@ class Builder(object):
         time = source_data['time']
         if isinstance(time, datetime):
             time = time.strftime(config.format_date_n)
-        values = [source_data['game_code'], source_data['media'], source_data['osa_name'], device,
-                  country, time, '%s-' % device_name, source_data['spend']]
+        spend = source_data['spend']  # 新台币的花费
+        spend_usd = round(spend / 30, 2)  # 由新台币转为美元的花费，汇率固定30
+        values = [source_data['game_code'], source_data['media'], source_data['osa_name'], device, country, time,
+                  '%s-' % device_name, spend, spend_usd]
         item_data['values'] = values
 
         # 有地区名称缓存则直接入库

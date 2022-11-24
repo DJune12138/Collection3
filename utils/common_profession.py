@@ -329,3 +329,44 @@ def get_argv(argv_key, transform=False):
     else:
         raise CheckUnPass('“argv_key”只能为str类型（单个）或list、tuple类型（多个）！')
     return result
+
+
+def get_exchange_rate(expensive, cheap, month):
+    """
+    获取不同月份实时汇率
+    :param expensive:(type=str) 相对价值高的货币
+    :param cheap:(type=str) 相对价值低的货币
+    :param month:(type=str) 实时汇率的月份，格式%Y-%m
+    :return exchange_rate:(type=float) 当月汇率
+    """
+
+    # 数据库
+    osa_db = services.mysql['osa_hy']  # 汇率数据
+    cache_redis = services.redis['127_5']  # 缓存数据
+
+    # 先从Redis缓存里查询
+    expensive, cheap = expensive.lower(), cheap.lower()
+    key = '%s_%s_%s' % (expensive, cheap, month.replace('-', ''))
+    exchange_rate = cache_redis.get(key)
+
+    # 没有就从OSA数据库获取
+    if exchange_rate is None:
+        after_table = 'WHERE from_cud="%s" AND to_cud="%s" AND month="%s"' % (expensive.upper(), cheap.upper(), month)
+        db_result = osa_db.select('exchange_rate_month', columns=['rate'], after_table=after_table, fetchall=False)
+        exchange_rate = db_result.get('rate')
+
+        # 实时汇率还没更新或远古月份没有保存，标记为短时间缓存，并使用默认汇率
+        short_cache = False
+        if exchange_rate is None:
+            short_cache = True
+            if expensive == 'usd' and cheap == 'twd':
+                exchange_rate = 30
+            else:
+                exchange_rate = 1
+
+        # 加入缓存并返回结果
+        # 每月实时汇率长期缓存，短时间缓存就为半小时
+        ex = None if not short_cache else 1800
+        cache_redis.set(key, str(float(exchange_rate)), ex=ex)
+    exchange_rate = float(exchange_rate)
+    return exchange_rate
