@@ -6,7 +6,7 @@
 
 from re import match
 from threading import Lock
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 import services
 import config
 from utils import common_profession as cp, common_function as cf
@@ -395,7 +395,7 @@ class Builder(object):
         """
 
         # 构造入库数据
-        platform, source_data = response.meta, response.data
+        platform, source_data = response.meta.lower(), response.data
         columns = ['gamecode', 'media', 'osa_name', 'device', 'country', 'time', 'item', 'spend', 'spend_usd']
         duplicates = ['spend', 'spend_usd']
         item_data = {'db_name': 'osa_%s' % platform, 'table': 'af_spend', 'columns': columns, 'duplicates': duplicates}
@@ -410,12 +410,16 @@ class Builder(object):
         country = 'OTHER' if not country or country in ('NONE', 'UNKNOWN') else country
         country_name = '其他' if country == 'OTHER' else services.redis['127_0'].get('%s_country_name' % country)
         time = source_data['time']
-        if isinstance(time, datetime):
+        if isinstance(time, datetime) or isinstance(time, date):
             time = time.strftime(config.format_date_n)
-        spend = source_data['spend']  # 新台币的花费
-        spend_usd = round(spend / 30, 2)  # 由新台币转为美元的花费，汇率固定30
+        if platform == 'hy':
+            rate = 30  # 新台币转为美元的汇率，和悦暂时固定30
+        else:
+            rate = 32 if time >= '2022-12-01' else 30  # 其他平台根据日期变化
+        spend_usd = source_data['spend']  # 原花费为美元
+        spend_twd = round(spend_usd * rate, 2)  # 根据汇率转化为新台币花费
         values = [source_data['game_code'], source_data['media'], source_data['osa_name'], device, country, time,
-                  '%s-' % device_name, spend, spend_usd]
+                  '%s-' % device_name, spend_twd, spend_usd]
         item_data['values'] = values
 
         # 有地区名称缓存则直接入库
