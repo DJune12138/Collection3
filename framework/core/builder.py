@@ -647,9 +647,10 @@ class Builder(object):
                 game_code, game_name = all_data['game_code'], all_data['game_name']
                 total_server = {'online': 0, 'register': 0, 'login': 0, 'pay': 0, 'amt': 0.0}  # 日报表的全服汇总数据
                 db_name = 'osa_%s' % self.platform
-                item_data = {'db_name': db_name, 'insert_limit': self.name, 'values': list(), 'limit_line': 50,
-                             'columns': ['game_name', 'gamecode', 'servercode', 'serid', 'date', 'num', 'pay_per',
-                                         'add_user_num', 'pay_num', 'pay_amount', 'arpu']}
+                columns = ['game_name', 'gamecode', 'servercode', 'serid', 'date', 'num', 'pay_per', 'add_user_num',
+                           'pay_num', 'pay_amount', 'arpu']
+                item_data = {'db_name': db_name, 'insert_limit': self.name, 'values': list(), 'columns': columns,
+                             'ignore': True, 'limit_line': 50}
                 table = ''
                 if report_type == 'realtime':
                     table = 'oper_analyze_day'

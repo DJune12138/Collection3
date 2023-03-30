@@ -9,7 +9,7 @@ from copy import deepcopy
 from geoip2 import database as geoip2_db, errors as geoip2_e
 import services  # 该模块在加载服务前就已经被导入，只能导入总模块，否则所有服务都会是加载前的None
 from config import ding_token, factory_config, factory_code, geoip2_path, pk_st, pk_et, gc_interval, format_date, \
-    format_datetime
+    format_datetime, account_name
 from utils import common_function as cf
 from framework.error.check_error import CheckUnPass
 
@@ -353,16 +353,15 @@ def get_exchange_rate(expensive, cheap, month):
     if exchange_rate is None:
         after_table = 'WHERE from_cud="%s" AND to_cud="%s" AND month="%s"' % (expensive.upper(), cheap.upper(), month)
         db_result = osa_db.select('exchange_rate_month', columns=['rate'], after_table=after_table, fetchall=False)
-        exchange_rate = db_result.get('rate')
 
         # 实时汇率还没更新或远古月份没有保存，标记为短时间缓存，并使用默认汇率
-        short_cache = False
-        if exchange_rate is None:
+        # 已更新则使用新汇率，并长期缓存
+        if db_result is None:
             short_cache = True
-            if expensive == 'usd' and cheap == 'twd':
-                exchange_rate = 30
-            else:
-                exchange_rate = 1
+            exchange_rate = 30 if expensive == 'usd' and cheap == 'twd' else 1
+        else:
+            short_cache = False
+            exchange_rate = db_result['rate']
 
         # 加入缓存并返回结果
         # 每月实时汇率长期缓存，短时间缓存就为半小时
@@ -370,3 +369,15 @@ def get_exchange_rate(expensive, cheap, month):
         cache_redis.set(key, str(float(exchange_rate)), ex=ex)
     exchange_rate = float(exchange_rate)
     return exchange_rate
+
+
+def get_secret(key):
+    """
+    获取secret的内容
+    :param key:(type=str) 要获取secret的key
+    :return result:(type=∞) secret内容
+    """
+
+    with open('%s/secret.json' % account_name, 'r') as f:
+        result = cf.json_loads(f.read())[key]
+    return result

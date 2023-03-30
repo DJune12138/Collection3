@@ -175,11 +175,12 @@ class MySQL(object):
         value = str(value).replace('"', '""').replace('\\', r'\\')
         return value
 
-    def execute(self, sql, args=None, fetchall=True, debug=False, **kwargs):
+    def execute(self, sql, args=None, many=False, fetchall=True, debug=False, **kwargs):
         """
         执行SQL语句，常规增删改查可使用对应方法，自编写语句可直接使用此方法
         :param sql:(type=str) 要执行的SQL语句，一般用于执行常规增删改查之外的语句
         :param args:(type=tuple,list,dict) pymysql自带args，类似自动拼接SQL字符串并处理一些特殊符号的功能，默认None则不使用
+        :param many:(type=bool) 是否使用executemany，一次执行多条SQL语句提高效率，默认不使用
         :param fetchall:(type=bool) 仅SELECT语句有效，是否返回查到的所有数据，True返回所有，False返回第一条，默认返回所有
         :param debug:(type=bool) 是否打印SQL语句以供调试，默认False则不打印
         :param kwargs:(type=dict) 额外的关键字参数，主要用于防止传入过多参数报错
@@ -199,7 +200,10 @@ class MySQL(object):
         if debug:
             cf.print_log(sql)
         try:
-            result = cursor.execute(sql, args=args)
+            if not many:
+                result = cursor.execute(sql, args=args)
+            else:
+                result = cursor.executemany(sql, args)
         except Exception as e:
             raise ExecuteError(sql, args, e)
 
@@ -253,7 +257,7 @@ class MySQL(object):
         :param table:(type=str) 要插入数据的表名
         :param values:(type=list) 单条数据，["a", "b", "c", ...]；多条数据，[["a", "b", "c", ...], [1, 2, 3, ...], ...]
         :param columns:(type=list) 需要插入数据的字段，默认所有字段，["column1", "column2", "column3", ...]
-        :param duplicates:(type=list) 唯一键冲突则更新，["column1", "column2", "column3", ...]
+        :param duplicates:(type=list) 唯一键冲突则更新，["column1", "column2", "column3", ...]，带上“::”则使用判断，详见对应注释
         :param ignore:(type=bool) 唯一键冲突则忽略，默认False；如果duplicates不为None，则ignore强制为False
         :param dup_ac:(type=bool) 适配自动采集流程用，会判断更新冲突数据，duplicates不为None才有效，默认False不启用
         :param limit_line:(type=int) 在插入多条数据时可启用，避免一次插入过多数据，每次分批插入几条，默认None则不启用
@@ -297,6 +301,8 @@ class MySQL(object):
             values_sql = '(%s)' % ','.join(['"%s"' % self.__replace_value(value) for value in values])
 
         # 拼接“唯一键冲突则更新”
+        # 元素里带上“::”则使用判断条件来更新，如“column::>=”则为新数值大于旧数值才更新
+        # >、>=、<、<=可直接代入，其余为自定义条件
         if duplicates is not None:
             if not isinstance(duplicates, list):
                 raise MySQLError('duplicates参数类型应该为list！')
@@ -306,8 +312,20 @@ class MySQL(object):
                         duplicate, duplicate, duplicate, duplicate.replace('time', 'date'), duplicate, duplicate,
                         duplicate) for duplicate in duplicates])
             else:
-                duplicates_sql = 'ON DUPLICATE KEY UPDATE %s' % ','.join(
-                    ['%s=VALUES(%s)' % (duplicate, duplicate) for duplicate in duplicates])
+                duplicate_list = list()
+                for duplicate in duplicates:
+                    ds = duplicate.split('::')
+                    if len(ds) == 1:
+                        dup_str = '%s=VALUES(%s)' % (duplicate, duplicate)
+                    else:
+                        column_key, if_key = ds[0], ds[1]
+                        if if_key in ('>', '>=', '<', '<='):
+                            dup_str = '%s=IF(VALUES(%s)%s%s,VALUES(%s),%s)' \
+                                      % (column_key, column_key, if_key, column_key, column_key, column_key)
+                        else:
+                            dup_str = '%s=IF(%s,VALUES(%s),%s)' % (column_key, if_key, column_key, column_key)
+                    duplicate_list.append(dup_str)
+                duplicates_sql = 'ON DUPLICATE KEY UPDATE %s' % ','.join(duplicate_list)
             ignore = False  # ignore强制为False
         else:
             duplicates_sql = ''
