@@ -135,9 +135,13 @@ logger_config = {
 # 钉钉机器人token
 dk_plan = 'plan'  # plan的key
 dk_live = 'live'
+dk_exchange = 'exchange'
+dk_marketing = 'marketing'
 ding_token = {
     dk_plan: 'facaf0e73f3eb3d7536a0caed2c3001d073f33fc4fb3e9b8be8adfedcc6bc15d',  # 计划任务
-    dk_live: 'fa66808a722dd7b2a147d47cc13a6d8e9db71b9d01ff2e613f2005c3cd30d881'  # 直播后台
+    dk_live: 'fa66808a722dd7b2a147d47cc13a6d8e9db71b9d01ff2e613f2005c3cd30d881',  # 直播后台
+    dk_exchange: '88ddb1e6c4e96c9ba76efd9bb064c1263eed928be354194525fce1dbbc3431b8',  # 汇率告警
+    dk_marketing: 'e48c0350157ffd8fa8aa0f2da7687a1222953aa2263b992d579f04f86ff13de8'  # 行销告警
 }
 ding_is_send = factory_config[factory_code]['ding_is_send']
 
